@@ -16,12 +16,13 @@ Open the local address printed by Vite. Location access works on `localhost` or 
 
 ## Features
 
-- Esri satellite map centered on your browser location, with a Bengaluru demo fallback, selectable issue pins, and visible latitude/longitude. The schematic street grid is omitted from the satellite view.
+- Esri satellite map centered on your browser location, with a Bengaluru demo fallback, selectable issue pins, and visible latitude/longitude. Nearby schools are looked up from OpenStreetMap after location access is granted.
 - Four accessibility personas plus an everyone view; scores and rankings respond to the selected person.
 - Plain-language Top 10 queue and a breakdown of impact, nearby footfall, confirmations, and time unresolved.
 - Report categories, map pin, photo attachment, multilingual text classification, and optional browser speech recognition in English, Hindi, and Kannada.
 - Nearby duplicate detection and merging.
-- Route planning between a hospital, school, bus stop, market, and metro station, with barriers and possible unblock fixes.
+- Nearby school choices use real OpenStreetMap names and coordinates. Government and primary labels appear only when the mapped school name or tags support that classification.
+- Pedestrian routing follows mapped streets through the public Valhalla demo service, with a wheelchair profile for wheelchair users, a blind profile for visually impaired users, estimated distance/time, and turn-by-turn directions. Prototype issue pins near the route are called out separately.
 - A rupee-denominated repair budget planner ranked by priority per rupee, including a comparison of remaining barrier load for all four personas.
 - Confirm a repair, attach an after photo, view a before/after comparison, and print a ward brief.
 - Responsive layout, system dark mode, keyboard focus styles, and reduced-motion support.
@@ -36,10 +37,9 @@ Last-100-Metres/
 └── src/
     ├── main.js        # App state, UI rendering, and interactions
     ├── styles.css     # Layout, theme, and responsive styles
-    ├── data.js        # Personas, issue seeds, places, and repair costs
+    ├── data.js        # Personas, issue seeds, fallback demo landmarks, and repair costs
     ├── scoring.js     # Priority scoring and explanations
-    ├── streets.js     # Study-area route graph and routing utilities
     └── reporting.js   # English, Hindi, and Kannada issue suggestions
 ```
 
-The score is an explainable demo heuristic. Reports and photo previews stay in browser memory and reset when the page is refreshed. Speech recognition depends on browser support and microphone permission.
+The score and sample issue pins are explainable demo data; the school destinations and route geometry are real map data when available. Reports and photo previews stay in browser memory and reset when the page is refreshed. School lookup and routing need internet access and depend on public OpenStreetMap services and their usage limits. Street routing is an estimate and does not include live traffic. Speech recognition depends on browser support and microphone permission.
