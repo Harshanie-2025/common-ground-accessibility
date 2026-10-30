@@ -14,7 +14,8 @@ const band=priorityBand;
 const sc=(issue,persona=ps)=>calculateScore(issue,persona,schools.length?scorePlaces():undefined);
 const why=(issue,breakdown)=>explainScore(issue,breakdown,ps);
 const map=$('#map'),DEMO_CENTER={lat:12.9716,lng:77.5946},METERS_PER_UNIT=2.5;
-let origin={...DEMO_CENTER},located=false,userMarker=null,reportMarker=null,schools=[],schoolRequest=0,fitNextRoute=false,schoolLookupKey='',schoolLookupAt=0,schoolLookupReady=false,schoolLookupPending=false;
+let origin={...DEMO_CENTER},located=false,userMarker=null,reportMarker=null,schools=[],schoolRequest=0,fitNextRoute=false,schoolLookupKey='',schoolLookupAt=0,schoolLookupReady=false,schoolLookupPending=false,schoolSearchPending=false,schoolSearchError='',schoolSource='';
+let lastNominatimSearchAt=0;
 const routeCache=new Map(),routePending=new Map();
 const geoMap=L.map(map,{zoomControl:true,scrollWheelZoom:false,preferCanvas:true}).setView([origin.lat,origin.lng],15);
 geoMap.createPane('routePane');geoMap.getPane('routePane').style.zIndex=450;
@@ -89,6 +90,7 @@ async function loadNearbySchools(center){
   if(!data)throw lastError||new Error('Nearby school data is temporarily unavailable.');
   if(request!==schoolRequest)return;
   schoolLookupReady=true;schoolLookupPending=false;
+  schoolSource='Overpass';schoolSearchError='';
   schools=(data.elements||[]).map(e=>{
    const point=e.center||e;const classified=classifySchool(e.tags||{});
    return{id:`school-${e.type}-${e.id}`,osmType:e.type,osmId:e.id,lat:point.lat,lon:point.lon,...classified};
@@ -106,8 +108,39 @@ async function loadNearbySchools(center){
   schoolLookupPending=false;
   schools=[];rebuildRouteOptions(false);drawSchoolLayer();render();
   $('#locstatus').textContent='Satellite view near you · school lookup unavailable';
+  schoolSource='';
   if(!$('#p-rt').hidden)routeUI();
  }
+}
+async function searchNearbySchoolMatches(){
+ if(!located||schoolSearchPending)return;
+ schoolSearchPending=true;schoolSearchError='';
+ if(!$('#p-rt').hidden)routeUI();
+ const wait=Math.max(0,1000-(Date.now()-lastNominatimSearchAt));
+ if(wait)await new Promise(resolve=>setTimeout(resolve,wait));
+ lastNominatimSearchAt=Date.now();
+ try{
+  // This is a user-triggered, bounded search. Nominatim returns best matches,
+  // not a complete inventory of every school in the area.
+  const latDelta=5000/111320,lonDelta=5000/(111320*Math.cos(origin.lat*Math.PI/180));
+  const params=new URLSearchParams({amenity:'school',format:'jsonv2',limit:'20',viewbox:[origin.lng-lonDelta,origin.lat+latDelta,origin.lng+lonDelta,origin.lat-latDelta].join(','),bounded:'1',extratags:'1','accept-language':'en'});
+  const response=await fetch(`https://nominatim.openstreetmap.org/search?${params}`,{headers:{Accept:'application/json'},referrerPolicy:'origin',signal:AbortSignal.timeout(15000)});
+  if(!response.ok)throw new Error(`OpenStreetMap search returned ${response.status}.`);
+  const data=await response.json();
+  schools=(data||[]).map(e=>{
+   const tags={...(e.extratags||{}),name:e.name||e.display_name?.split(',')[0]||'Unnamed school'};
+   const classified=classifySchool(tags);
+   return{id:`school-${e.osm_type}-${e.osm_id}`,osmType:e.osm_type,osmId:e.osm_id,lat:Number(e.lat),lon:Number(e.lon),...classified};
+  }).filter(s=>Number.isFinite(s.lat)&&Number.isFinite(s.lon)&&s.name!=='Unnamed school')
+   .sort((a,b)=>distanceMeters(origin,{lat:a.lat,lng:a.lon})-distanceMeters(origin,{lat:b.lat,lng:b.lon}))
+   .filter((s,i,all)=>all.findIndex(x=>x.name.toLowerCase()===s.name.toLowerCase()&&Math.abs(x.lat-s.lat)<.00015&&Math.abs(x.lon-s.lon)<.00015)===i);
+  schoolLookupReady=true;schoolSource='Nominatim';schoolSearchError='';
+  rebuildRouteOptions(false);drawSchoolLayer();fitNextRoute=true;render();
+  $('#locstatus').textContent=schools.length?`Satellite view near you · ${schools.length} OpenStreetMap school matches`:'Satellite view near you · no school matches found';
+  if(schools.length)toast(`Found ${schools.length} OpenStreetMap school matches. Results may be incomplete.`);
+  else toast('No school matches found in this area. Try again later or choose another location.');
+ }catch(error){schoolSearchError=error.message||'The OpenStreetMap school search is temporarily unavailable.';$('#locstatus').textContent='Satellite view near you · school search unavailable'}
+ finally{schoolSearchPending=false;if(!$('#p-rt').hidden)routeUI()}
 }
 function distanceMeters(a,b){const dy=(a.lat-b.lat)*111320,dx=(a.lng-b.lng)*111320*Math.cos(a.lat*Math.PI/180);return Math.hypot(dx,dy)}
 function pinReport(ll){if(reportMarker)reportMarker.remove();reportMarker=L.circleMarker(ll,{radius:10,color:'#fff',weight:3,fillColor:'#d6246e',fillOpacity:1}).addTo(reportLayer)}
@@ -214,10 +247,14 @@ function showRoute(route,from,to,fit){
 function routeUI(){
  routeLayer.clearLayers();if($('#p-rt').hidden)return;
  const p=P[ps],from=routeStop($('#ra').value),to=routeStop($('#rb').value),costing=profile();
- $('#rtn').textContent=`${located?'Nearby schools are based on OpenStreetMap data.':'Use your location to load nearby schools.'} Walking profile: ${costing==='blind'?'visually impaired':costing==='wheelchair'?'wheelchair':'standard pedestrian'}.`;
+ $('#rtn').textContent=`${located?(schoolSource==='Nominatim'?'OpenStreetMap search matches may be incomplete.':'Nearby schools are based on OpenStreetMap data.'):'Use your location to load nearby schools.'} Walking profile: ${costing==='blind'?'visually impaired':costing==='wheelchair'?'wheelchair':'standard pedestrian'}.`;
  if(!from||!to||$('#ra').value===$('#rb').value){
-  const message=!located?'Use your location to find nearby schools.':schoolLookupPending?'Finding nearby schools…':!schoolLookupReady?'OpenStreetMap school data is temporarily unavailable. Try again shortly.':!schools.length?'No named schools are listed nearby in OpenStreetMap.':'Choose two different locations.';
-  $('#rres').innerHTML=`<div class="route-empty"><strong>${message}</strong><span>${schools.length?'Pick a nearby school for turn-by-turn walking directions.':'Government and primary labels appear when local map data identifies them.'}</span></div>`;return
+  const message=!located?'Use your location to find nearby schools.':schoolLookupPending?'Finding nearby schools…':schoolSearchPending?'Searching OpenStreetMap for nearby school matches…':schoolSearchError?'OpenStreetMap could not complete the school search.':!schoolLookupReady?'Nearby school data is temporarily unavailable.':!schools.length?'No nearby school matches were found.':'Choose two different locations.';
+  const searchAction=located&&!schools.length&&!schoolLookupPending&&!schoolSearchPending?`<button class="sm" id="search-schools" type="button">Search nearby schools in OpenStreetMap</button><small>Search matches are best results and may not include every school. OpenStreetMap data © contributors.</small>`:'';
+  const detail=schoolSearchError?`<span>${esc(schoolSearchError)}</span>`:schools.length?'<span>Pick a nearby school for turn-by-turn walking directions.</span>':!located?'<span>Government and primary labels appear when local map data identifies them.</span>':'';
+  $('#rres').innerHTML=`<div class="route-empty"><strong>${message}</strong>${detail}${searchAction}</div>`;
+  const searchButton=$('#search-schools');if(searchButton)searchButton.onclick=searchNearbySchoolMatches;
+  return
  }
  const key=[from.lat.toFixed(6),from.lon.toFixed(6),to.lat.toFixed(6),to.lon.toFixed(6),costing].join('|'),fit=fitNextRoute;fitNextRoute=false;currentRouteKey=key;
  if(routeCache.has(key)){showRoute(routeCache.get(key),from,to,fit);return}
