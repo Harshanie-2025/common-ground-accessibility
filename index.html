@@ -64,7 +64,7 @@
   <div class="lg"><span style="--k:var(--c1)">Critical 75+</span><span style="--k:var(--c2)">High 55+</span><span style="--k:var(--c3)">Medium 35+</span><span style="--k:var(--c4)">Low</span><span style="--k:var(--ink)">Sample issues</span><span style="--k:var(--ac)">Tap the map to report</span></div>
  </section>
  <aside>
-  <div class="tabs"><button data-t="top" class="on">Top 10 fixes</button><button data-t="rep">Report</button><button data-t="det">Issue</button><button data-t="rt">Route</button><button data-t="plan">Plan</button></div>
+  <div class="tabs"><button data-t="top" class="on">Top 10 fixes</button><button data-t="rep">Report</button><button data-t="det">Issue</button><button data-t="rt">Route</button><button data-t="plan">Plan</button><button data-t="hist">History <span class="tab-count" id="history-count">0</span></button></div>
   <div class="pn" id="p-top"><p class="mu" id="note"></p><ol id="top"></ol></div>
   <div class="pn" id="p-rep" hidden>
    <div class='two' style='grid-template-columns:1fr auto auto'><input class='in' id='vt' placeholder='Say or type it: ಗುಂಡಿ, गड्ढा, pothole' aria-label='Describe the issue'><select id='lg' aria-label='Language'><option value='en-IN'>English</option><option value='hi-IN'>हिन्दी</option><option value='kn-IN'>ಕನ್ನಡ</option></select><button class='sm' id='mic' style='margin:0' aria-label='Speak'>🎤</button></div>
@@ -77,8 +77,21 @@
    <button class="btn g" id="dup">Try a duplicate report</button>
   </div>
   <div class="pn" id="p-det" hidden></div>
-  <div class='pn' id='p-rt' hidden><p class='mu' id='rtn'></p><div class='two'><select id='ra' aria-label='From'></select><select id='rb' aria-label='To'></select></div><div class='res' id='rres'></div></div>
+  <div class='pn' id='p-rt' hidden>
+   <p class='mu' id='rtn' aria-live='polite'></p>
+   <div class='route-tools'>
+    <strong>Route between any two places</strong>
+    <div class='two route-pick-actions'><button class='sm' id='pick-route-start' type='button'>Set start on map</button><button class='sm' id='pick-route-end' type='button'>Set destination on map</button></div>
+    <label class='route-search-label' for='route-query'>Or search any address or place</label>
+    <div class='two route-search-row'><input class='in' id='route-query' type='search' maxlength='180' placeholder='Street, landmark, address…'><button class='sm' id='route-search' type='button'>Search</button></div>
+    <div class='route-search-results' id='route-search-results' aria-live='polite'></div>
+    <small class='route-source'>OpenStreetMap place-search matches may be incomplete. © OpenStreetMap contributors.</small>
+   </div>
+   <div class='two'><select id='ra' aria-label='Route start'></select><select id='rb' aria-label='Route destination'></select></div>
+   <div class='res' id='rres' aria-live='polite'></div>
+  </div>
   <div class='pn' id='p-plan' hidden><p class='mu'>Set a repair budget. The plan picks the fixes that give the most relief per rupee for the persona above.</p><input type='range' id='bud' min='0' max='150000' step='5000' value='50000' aria-label='Repair budget'><div id='pres'></div></div>
+  <div class='pn' id='p-hist' hidden><div class='history-heading'><div><strong>Completed tasks</strong><p class='mu'>Fixes you marked complete on this device.</p></div><span class='history-total' id='history-total'>0</span></div><div id='history-list' aria-live='polite'></div></div>
  </aside>
 </main>
 <div id='brief'></div><div id="toast" role="status"></div>

@@ -7,10 +7,10 @@ export function priorityBand(score) {
   return ['Low', 'var(--c4)'];
 }
 
-export function calculateScore(issue, personaId = 'wheel') {
+export function calculateScore(issue, personaId = 'wheel', places = PLACES) {
   const impactWeight = PERSONAS[personaId].weights[CATEGORY_KEYS.indexOf(issue.type)];
   let nearest = null;
-  PLACES.forEach((place) => {
+  places.forEach((place) => {
     const distance = Math.hypot(place.x - issue.x, place.y - issue.y) * 2.5;
     const exposure = Math.max(0, 1 - distance / 150) * place.weight;
     if (!nearest || exposure > nearest.exposure || (exposure === nearest.exposure && distance < nearest.distance)) {
