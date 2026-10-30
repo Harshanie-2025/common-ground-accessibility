@@ -4,6 +4,7 @@ import './styles.css';
 import { CATEGORY_KEYS, ISSUE_TITLES, PERSONAS, REPAIR_COSTS, createSeedIssues } from './data.js';
 import { calculateScore, explainScore, priorityBand } from './scoring.js';
 import { guessIssueCategory } from './reporting.js';
+import { getNotifications, addNotification, markAsRead, clearNotifications } from './notification.js';
 
 const $=s=>document.querySelector(s);
 const K=CATEGORY_KEYS,T=ISSUE_TITLES;
@@ -221,8 +222,9 @@ function repUI(){
 $('#ph').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{rep.ph=r.result;repUI()};r.readAsDataURL(f)};
 $('#dup').onclick=()=>{const i=issues[1];rep={x:i.x+9,y:i.y+7,t:i.t};repUI();toast('A second report of the same issue, 12 m away. Now press Submit.')};
 $('#go').onclick=()=>{const{x,y,t,ph}=rep,d=issues.find(i=>i.t==t&&Math.hypot(i.x-x,i.y-y)<=20);
- if(d){const m=Math.round(Math.hypot(d.x-x,d.y-y)*2.5);d.n++;d.reports=d.n;d.mg++;merged++;if(ph&&!d.ph)d.ph=ph;ring(d.x,d.y);cur=d.id;toast(`Duplicate found: same ${T[t].toLowerCase()} ${m} m from #${d.id}. Merged, now ${d.n} reports on one issue.`)}
- else{const n={id:issues.length+1,t,type:t,x,y,n:1,reports:1,age:0,mg:0,ph};issues.push(n);ring(x,y);cur=n.id;toast(`Issue #${n.id} added to the map and scored.`)}
+ if(d){const m=Math.round(Math.hypot(d.x-x,d.y-y)*2.5);d.n++;d.reports=d.n;d.mg++;merged++;if(ph&&!d.ph)d.ph=ph;ring(d.x,d.y);cur=d.id;toast(`Duplicate found: same ${T[t].toLowerCase()} ${m} m from #${d.id}. Merged, now ${d.n} reports on one issue.`);addNotification('Report merged',`Your report was merged with existing issue #${d.id}. Total reports: ${d.n}.`)}
+ else{const n={id:issues.length+1,t,type:t,x,y,n:1,reports:1,age:0,mg:0,ph};issues.push(n);ring(x,y);cur=n.id;toast(`Issue #${n.id} added to the map and scored.`);addNotification('New issue reported',`Your issue #${n.id} has been added successfully.`)}
+ renderNotifications();
  rep={};$('#ph').value='';repUI();render();tab('det')};
 function render(){
  const p=P[ps],rows=live().map(i=>({i,s:sc(i)}));
@@ -331,10 +333,10 @@ function fixIt(i){
  const ll=toLatLng(i.x,i.y),record={issueId:i.id,type:i.t,title:T[i.t],x:i.x,y:i.y,lat:ll.lat,lon:ll.lng,baseLat:origin.lat,baseLon:origin.lng,completedAt:i.completedAt,reports:i.n,afterPhoto:Boolean(i.af)};
  historyRecords=[record,...historyRecords.filter(r=>!(Number(r.issueId)===i.id&&r.type===i.t&&r.x===i.x&&r.y===i.y))].slice(0,200);
  try{localStorage.setItem(HISTORY_KEY,JSON.stringify(historyRecords))}catch{toast('Task marked fixed. Browser storage is unavailable, so history lasts only until this page closes.')}
- if(!$('#p-hist').hidden)renderHistory();toast(`#${i.id} marked fixed and added to History.`);render()
+ if(!$('#p-hist').hidden)renderHistory();toast(`#${i.id} marked fixed and added to History.`);addNotification('Issue marked fixed',`Issue #${i.id} (${T[i.t]}) was marked as fixed.`);renderNotifications();render()
 }
 function wire(i){const D=$('#p-det'),q=s=>D.querySelector(s);
- if(q('#st'))q('#st').onclick=()=>{i.n++;i.reports=i.n;i.cf=(i.cf||0)+1;toast(`Confirmed. #${i.id} now has ${i.n} reports, so its score went up.`);render()};
+ if(q('#st'))q('#st').onclick=()=>{i.n++;i.reports=i.n;i.cf=(i.cf||0)+1;toast(`Confirmed. #${i.id} now has ${i.n} reports, so its score went up.`);addNotification('Issue confirmed',`You confirmed that issue #${i.id} is still broken.`);renderNotifications();render()};
  if(q('#af'))q('#af').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>i.af=r.result;r.readAsDataURL(f)};
  if(q('#fx'))q('#fx').onclick=()=>fixIt(i);
  const g=q('input[type=range]');if(g)g.oninput=()=>q('.cmp').style.setProperty('--p',g.value)}
@@ -349,3 +351,21 @@ $('#route-search').onclick=searchRoutePlace;
 $('#route-query').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();searchRoutePlace()}};
 $('#bud').oninput=planUI;
 repUI();render();showCoordinates(L.latLng(origin.lat,origin.lng),'Bengaluru demo center');requestMyLocation();
+
+function renderNotifications(){
+ const count=$('#notification-count'),list=$('#notification-list');if(!count||!list)return;
+ const notifications=getNotifications(),unread=notifications.filter(n=>!n.read).length;
+ count.textContent=unread;count.hidden=unread===0;list.replaceChildren();
+ if(!notifications.length){list.textContent='No notifications yet.';return}
+ notifications.forEach(n=>{
+  const item=document.createElement('button');item.type='button';item.className='notification-item'+(n.read?'':' unread');
+  const title=document.createElement('strong');title.textContent=n.title;
+  const message=document.createElement('span');message.textContent=n.message;
+  const time=document.createElement('small');time.textContent=new Date(n.time).toLocaleString();
+  item.append(title,message,time);item.onclick=()=>{markAsRead(n.id);renderNotifications()};list.append(item)
+ });
+}
+const notificationToggle=$('#notification-toggle'),notificationPanel=$('#notification-panel');
+if(notificationToggle&&notificationPanel)notificationToggle.onclick=()=>{notificationPanel.hidden=!notificationPanel.hidden;notificationToggle.setAttribute('aria-expanded',String(!notificationPanel.hidden))};
+const clearButton=$('#clear-notifications');if(clearButton)clearButton.onclick=()=>{clearNotifications();renderNotifications()};
+renderNotifications();

@@ -9,10 +9,47 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&display=swap">
 </head>
 <body>
+
 <header>
- <div class="br"><i></i><div><b>Last 100 m</b><small>One street, four realities. Fix what helps the most people first.</small></div></div>
- <nav id="pers" aria-label="Persona"></nav>
+  <div class="br">
+    <i></i>
+    <div>
+      <b>Last 100 m</b>
+      <small>One street, four realities. Fix what helps the most people first.</small>
+    </div>
+  </div>
+
+  <nav id="pers" aria-label="Persona"></nav>
+
+  <!-- Notification System -->
+  <div class="notification-container">
+    <button
+      id="notification-toggle"
+      class="notification-btn"
+      type="button"
+      aria-label="Notifications"
+      aria-expanded="false"
+      aria-controls="notification-panel"
+    >
+      <span>🔔</span>
+      <span id="notification-count" class="notification-count" hidden>0</span>
+    </button>
+
+    <div id="notification-panel" class="notification-panel" hidden>
+      <div class="notification-header">
+        <h3>Notifications</h3>
+        <button id="clear-notifications" type="button">
+          Clear all
+        </button>
+      </div>
+
+      <div id="notification-list">
+        <p>No notifications yet.</p>
+      </div>
+    </div>
+  </div>
 </header>
+
 <main>
  <section class="mapc">
   <div class="st">
