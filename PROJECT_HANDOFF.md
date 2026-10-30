@@ -7,7 +7,7 @@
 
 ## Project purpose
 
-An accessibility-first civic dashboard for reporting street barriers and choosing repairs that help wheelchair users, older adults, people with visual impairments, and parents with strollers. It is a frontend prototype with seeded demo issues and no backend.
+An accessibility-first civic dashboard for reporting street barriers and choosing repairs that help wheelchair users, older adults, people with visual impairments, and parents with strollers. It is a frontend prototype with seeded demo issues, no app database or user accounts, and an optional local Vite middleware endpoint for AI.
 
 ## Implemented
 
@@ -20,6 +20,9 @@ An accessibility-first civic dashboard for reporting street barriers and choosin
 - Route endpoints show their coordinates. A public Valhalla service returns pedestrian route geometry, distance, ETA, and turn-by-turn steps. Wheelchair and visually impaired profiles pass different pedestrian settings. Prototype issue pins near the route are flagged separately.
 - A **History** tab lists issues marked fixed. It saves task ID, type, completion time, coordinates, and whether an after photo was attached in browser `localStorage`; the list survives refreshes on the same browser/device. New reports and actual photo data are still session-only.
 - This project is kept as one root with a single `src/` directory. No second `src` folder is needed.
+- Added a floating **Access AI** chat bubble at the bottom-right, backed by OpenRouter's OpenAI-compatible Chat Completions API through a Vite server-side proxy. Default model: `openai/gpt-4o-mini`; change it with `OPENROUTER_MODEL`. It can explain the current issue ranking and offer ward-planning suggestions for the selected persona. It cannot change scores, reports, routes, or completion history.
+- AI setup: copy `.env.example` to `.env`, set `OPENROUTER_API_KEY`, optionally set `OPENROUTER_MODEL`, then restart `npm run dev`. The key is read only by the server and `.env` is ignored by Git. Without a key, the rest of the app continues to work and the AI panel shows setup instructions.
+- The AI request contains the user's question and a filtered board summary: selected persona, aggregate open/completed/urgent counts, and up to 15 issue categories, scores, report counts, and days open. The server strips all other context fields. It does not send coordinates, photos, route endpoints, or completion history. OpenRouter and the selected model provider handle the submitted prompt under their own policies; browser chat is session-only.
 
 ## Run locally
 
@@ -51,6 +54,8 @@ Open the local URL printed by Vite. Location access requires `localhost` or HTTP
 - Route paths depend on the public Valhalla demo server and mapped street data. A route may fail if a requested point cannot connect to its pedestrian graph or the service is unavailable. There is no live traffic or guaranteed wheelchair accessibility.
 - Esri supplies satellite imagery. OpenStreetMap supplies school/place search matches and routing data. These external services need internet access and may impose limits or change availability.
 - Completed history is local to one browser profile. It is not synced to GitHub, another device, or another user. The project has no server/database/authentication.
+- The AI endpoint is a lightweight local prototype proxy in `vite.config.js`, with request-size and per-IP rate limits. The Vite dev and preview scripts bind to `127.0.0.1` so the AI key proxy is not exposed to other devices on the network. It does not provide production user authentication or distributed abuse controls. A static GitHub Pages deployment cannot execute it. A public deployment needs an equivalent serverless/server endpoint and its key stored in the host's secret settings.
+- OpenRouter API usage may incur charges depending on the selected model. Do not commit `.env` or expose the API key to frontend code.
 
 ## Remaining stretch work
 
@@ -65,6 +70,8 @@ Open the local URL printed by Vite. Location access requires `localhost` or HTTP
 - [Nominatim Search API](https://nominatim.org/release-docs/latest/api/Search/)
 - [Nominatim Usage Policy](https://operations.osmfoundation.org/policies/nominatim/)
 - [Valhalla project documentation](https://valhalla.github.io/valhalla/)
+- [OpenRouter API quickstart and endpoint](https://openrouter.ai/developers)
+- [OpenRouter chat completions API reference](https://openrouter.ai/docs/api/api-reference/chat/send-chat-completion-request)
 
 ## Suggested continuation checks
 

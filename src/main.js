@@ -15,11 +15,12 @@ let historyRecords=readHistory();
 const issues=createSeedIssues().map(i=>({id:i.id,t:i.type,type:i.type,x:i.x,y:i.y,n:i.reports,reports:i.reports,age:i.age,mg:i.merged}));
 function restoreCompletedIssues(){issues.forEach(i=>{delete i.fx;delete i.completedAt});for(const record of historyRecords){if(distanceMeters({lat:record.baseLat??DEMO_CENTER.lat,lng:record.baseLon??DEMO_CENTER.lng},origin)>1000)continue;const issue=issues.find(i=>i.id===Number(record.issueId)&&i.t===record.type&&i.x===record.x&&i.y===record.y);if(issue){issue.fx=true;issue.completedAt=record.completedAt}}}
 let ps='wheel',cur=0,merged=0,rep={};
+let aiConfigured=false,aiMessages=[],aiBusy=false;
 const band=priorityBand;
 const sc=(issue,persona=ps)=>calculateScore(issue,persona,schools.length?scorePlaces():undefined);
 const why=(issue,breakdown)=>explainScore(issue,breakdown,ps);
 const map=$('#map'),DEMO_CENTER={lat:12.9716,lng:77.5946},METERS_PER_UNIT=2.5;
-let origin={...DEMO_CENTER},located=false,userMarker=null,reportMarker=null,schools=[],schoolRequest=0,fitNextRoute=false,schoolLookupKey='',schoolLookupAt=0,schoolLookupReady=false,schoolLookupPending=false,schoolSearchPending=false,schoolSearchError='',schoolSource='',routePins={from:null,to:null},mapPickTarget=null,placeResults=[],placeSearchPending=false,placeSearchError='',nominatimBusy=false,lastNominatimSearchAt=0;
+let origin={...DEMO_CENTER},located=false,userMarker=null,reportMarker=null,reportPickActive=false,schools=[],schoolRequest=0,fitNextRoute=false,schoolLookupKey='',schoolLookupAt=0,schoolLookupReady=false,schoolLookupPending=false,schoolSearchPending=false,schoolSearchError='',schoolSource='',routePins={from:null,to:null},mapPickTarget=null,placeResults=[],placeSearchPending=false,placeSearchError='',nominatimBusy=false,lastNominatimSearchAt=0;
 restoreCompletedIssues();
 const routeCache=new Map(),routePending=new Map();
 const geoMap=L.map(map,{zoomControl:true,scrollWheelZoom:false,preferCanvas:true}).setView([origin.lat,origin.lng],15);
@@ -49,7 +50,7 @@ function drawSchoolLayer(){
   const kind=s.govt?'Government school':s.primary?'Primary school':'Nearby school';
   const marker=L.marker([s.lat,s.lon],{icon:L.divIcon({className:'poi-icon school-icon',html:'<span>🏫</span>',iconSize:[32,32],iconAnchor:[16,16]}),title:`${s.name} · ${kind}`}).addTo(placeLayer);
   marker.bindTooltip(s.name,{direction:'top',offset:[0,-12]});
-  marker.on('click',()=>{if($(`#rb option[value="${s.id}"]`)){$('#rb').value=s.id;showCoordinates(L.latLng(s.lat,s.lon),'Route destination');fitNextRoute=true;tab('rt')}});
+  marker.on('click',e=>{if(reportPickActive){if(e.originalEvent)L.DomEvent.stopPropagation(e.originalEvent);setReportLocation(e.latlng);return}if($(`#rb option[value="${s.id}"]`)){$('#rb').value=s.id;showCoordinates(L.latLng(s.lat,s.lon),'Route destination');fitNextRoute=true;tab('rt')}});
  });
 }
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -186,6 +187,8 @@ function setMapRoutePoint(slot,ll){
 }
 function distanceMeters(a,b){const dy=(a.lat-b.lat)*111320,dx=(a.lng-b.lng)*111320*Math.cos(a.lat*Math.PI/180);return Math.hypot(dx,dy)}
 function pinReport(ll){if(reportMarker)reportMarker.remove();reportMarker=L.circleMarker(ll,{radius:10,color:'#fff',weight:3,fillColor:'#d6246e',fillOpacity:1}).addTo(reportLayer)}
+function setReportLocation(ll){const point=L.latLng(ll),p=toLocal(point);rep.x=p.x;rep.y=p.y;reportPickActive=false;map.classList.remove('report-picking');$('#pick-report-location').classList.remove('active');$('#pick-report-location').setAttribute('aria-pressed','false');showCoordinates(point,'Selected report location');pinReport(point);tab('rep');repUI();toast(`Report location set at ${coordText(point)}.`)}
+function beginReportMapPick(){mapPickTarget=null;reportPickActive=true;map.classList.remove('route-picking');document.querySelectorAll('.route-pick-actions .active').forEach(button=>button.classList.remove('active'));tab('rep');map.classList.add('report-picking');$('#pick-report-location').classList.add('active');$('#pick-report-location').setAttribute('aria-pressed','true');toast('Tap any point on the map to set the report location.')}
 function ring(x,y){const c=L.circleMarker(toLatLng(x,y),{radius:15,className:'rg',fillOpacity:.35}).addTo(reportLayer);setTimeout(()=>c.remove(),1100)}
 function requestMyLocation(){
  if(!navigator.geolocation){$('#locstatus').textContent='Location is unavailable in this browser · showing the demo area';return}
@@ -203,11 +206,12 @@ function requestMyLocation(){
   toast(error.code===1?'Allow location access in your browser to center the satellite map on you.':'Could not read your location. The demo map is still available.');
  },{enableHighAccuracy:true,timeout:12000,maximumAge:60000});
 }
-geoMap.on('click',e=>{if(mapPickTarget){setMapRoutePoint(mapPickTarget,e.latlng);return}const p=toLocal(e.latlng);rep.x=p.x;rep.y=p.y;showCoordinates(e.latlng,'Selected report location');pinReport(e.latlng);tab('rep');repUI()});
+geoMap.on('click',e=>{if(mapPickTarget){setMapRoutePoint(mapPickTarget,e.latlng);return}setReportLocation(e.latlng)});
 $('#locate').onclick=requestMyLocation;
+$('#pick-report-location').onclick=beginReportMapPick;
 drawSchoolLayer();geoMap.fitBounds(L.latLngBounds(toLatLng(0,0),toLatLng(800,520)),{padding:[20,20],maxZoom:15});
 function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(t.h);t.h=setTimeout(()=>t.classList.remove('on'),4500)}
-function tab(k){['top','rep','det','rt','plan','hist'].forEach(x=>$('#p-'+x).hidden=x!=k);if(k=='rt')routeUI();else routeLayer.clearLayers();if(k==='hist')renderHistory();document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t==k))}
+function tab(k){if(reportPickActive&&k!=='rep'){reportPickActive=false;map.classList.remove('report-picking');$('#pick-report-location').classList.remove('active');$('#pick-report-location').setAttribute('aria-pressed','false')}['top','rep','det','rt','plan','hist'].forEach(x=>$('#p-'+x).hidden=x!=k);if(k=='rt')routeUI();else routeLayer.clearLayers();if(k==='hist')renderHistory();document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t==k))}
 document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>tab(b.dataset.t));
 function sel(id){cur=id;const i=issues.find(x=>x.id==id);if(i){const ll=toLatLng(i.x,i.y);showCoordinates(ll,'Issue #'+i.id);geoMap.panTo(ll)}render();tab('det')}
 function repUI(){
@@ -234,7 +238,7 @@ function render(){
  issues.forEach(i=>{
   const score=sc(i),color=i.fx?cssColor('--c4'):bandColor(band(score.total)[1]);
   const icon=L.divIcon({className:'pin-wrap',html:'<span class="map-pin '+(i.id==cur?'active ':'')+(i.fx?'fixed':'')+'" style="--pin-color:'+color+'"><span>'+(i.fx?'✓':score.total)+'</span></span>',iconSize:[32,32],iconAnchor:[16,30]});
-  if(!i.marker){i.marker=L.marker(toLatLng(i.x,i.y),{icon,title:'Issue #'+i.id+', '+T[i.t]+', score '+score.total,riseOnHover:true}).addTo(issueLayer);i.marker.on('click',e=>{if(e.originalEvent)L.DomEvent.stopPropagation(e.originalEvent);sel(i.id)})}
+  if(!i.marker){i.marker=L.marker(toLatLng(i.x,i.y),{icon,title:'Issue #'+i.id+', '+T[i.t]+', score '+score.total,riseOnHover:true}).addTo(issueLayer);i.marker.on('click',e=>{if(reportPickActive){if(e.originalEvent)L.DomEvent.stopPropagation(e.originalEvent);setReportLocation(e.latlng);return}if(e.originalEvent)L.DomEvent.stopPropagation(e.originalEvent);sel(i.id)})}
   else{i.marker.setLatLng(toLatLng(i.x,i.y));i.marker.setIcon(icon)}
   i.marker.bindTooltip('Issue #'+i.id+' · '+T[i.t]+' · '+(i.fx?'Fixed':'Score '+score.total),{direction:'top',offset:[0,-25]});
  });
@@ -290,7 +294,7 @@ function showRoute(route,from,to,fit){
  routeLayer.clearLayers();const latlngs=route.points.map(p=>L.latLng(p[0],p[1]));
  L.polyline(latlngs,{pane:'routePane',color:'#fff',weight:13,opacity:.92,lineCap:'round',lineJoin:'round',attribution:'Route data © OpenStreetMap contributors'}).addTo(routeLayer);
  L.polyline(latlngs,{pane:'routePane',color:cssColor('--ac'),weight:7,opacity:.97,lineCap:'round',lineJoin:'round'}).addTo(routeLayer);
- const endpoint=(ll,label,letter)=>L.marker(ll,{pane:'markerPane',icon:L.divIcon({className:'route-end-icon',html:`<span>${letter}</span>`,iconSize:[30,30],iconAnchor:[15,15]})}).addTo(routeLayer).bindTooltip(`${label} · ${coordText(L.latLng(ll.lat,ll.lon))}`,{direction:'top'});
+ const endpoint=(ll,label,letter)=>L.marker(ll,{pane:'markerPane',icon:L.divIcon({className:'route-end-icon',html:`<span>${letter}</span>`,iconSize:[30,30],iconAnchor:[15,15]})}).addTo(routeLayer).bindTooltip(`${label} · ${coordText(ll)}`,{direction:'top'});
  endpoint(L.latLng(from.lat,from.lon),from.name,'A');endpoint(L.latLng(to.lat,to.lon),to.name,'B');
  if(fit&&latlngs.length>1)geoMap.fitBounds(L.latLngBounds(latlngs),{padding:[55,55],maxZoom:17});
  const hazards=barriersOnRoute(route.points),summary=route.summary||{},steps=route.maneuvers||[];
@@ -343,6 +347,64 @@ function wire(i){const D=$('#p-det'),q=s=>D.querySelector(s);
 const tag=t=>{const k=guessIssueCategory(t);if(k){rep.t=k;repUI();toast(`Heard “${t}”. Tagged as ${T[k].toLowerCase()}. Now tap the map for the location.`)}else toast('Could not tell the issue type. Pick one below.')};
 $('#vt').onkeydown=e=>{if(e.key=='Enter'&&e.target.value.trim())tag(e.target.value)};
 $('#mic').onclick=()=>{const R=window.SpeechRecognition||window.webkitSpeechRecognition;if(!R)return toast('Voice input is not supported in this browser. Type instead.');const r=new R();r.lang=$('#lg').value;r.onresult=e=>{const t=e.results[0][0].transcript;$('#vt').value=t;tag(t)};r.onerror=()=>toast('The microphone is not available here. Type instead.');r.start()};
+function updateAiAvailability(configured,message=''){
+ aiConfigured=configured;
+ $('#ai-status').textContent=message||(configured?'AI ready':'Setup needed');
+ $('#ai-status').classList.toggle('ready',configured);
+ $('#ai-setup').hidden=configured;
+ $('#ai-send').disabled=!configured||aiBusy;
+ $('#ai-input').disabled=!configured||aiBusy;
+ $('#ai-suggestions').querySelectorAll('button').forEach(button=>button.disabled=!configured||aiBusy);
+}
+async function checkAiAvailability(){
+ try{const response=await fetch('/api/ai',{headers:{Accept:'application/json'}});const result=await response.json();updateAiAvailability(Boolean(result.configured))}
+ catch{updateAiAvailability(false,'Start the app server')}
+}
+function renderAiMessage(role,content){
+ const bubble=document.createElement('div');bubble.className=`ai-message ${role}`;bubble.textContent=content;
+ $('#ai-thread').append(bubble);$('#ai-thread').scrollTop=$('#ai-thread').scrollHeight;return bubble;
+}
+function aiBoardContext(){
+ const ranked=live().map(issue=>{const score=sc(issue);return{
+  id:issue.id,category:T[issue.t],score:score.total,priority:band(score.total)[0],
+  accessibilityImpact:Math.round(score.impact),reports:issue.n,daysOpen:issue.age,
+  mergedReports:issue.mg||0
+ }}).sort((a,b)=>b.score-a.score);
+ return{
+  selectedPersona:P[ps].n,
+  summary:{openIssues:ranked.length,completedIssues:issues.length-ranked.length,highPriorityIssues:ranked.filter(issue=>issue.score>=75).length},
+  issues:ranked.slice(0,15)
+ };
+}
+async function sendAiMessage(value){
+ const question=String(value||'').trim();if(!question||aiBusy)return;
+ if(!aiConfigured){toast('Add an OpenRouter API key to the local .env file to enable AI.');return}
+ $('#ai-input').value='';aiMessages.push({role:'user',content:question});
+ renderAiMessage('user',question);aiBusy=true;updateAiAvailability(true,'Thinking…');
+ const pending=renderAiMessage('assistant','Thinking…');pending.classList.add('pending');
+ try{
+  const response=await fetch('/api/ai',{method:'POST',headers:{'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({messages:aiMessages.slice(-8),context:aiBoardContext()})});
+  const result=await response.json().catch(()=>({}));
+  if(!response.ok)throw new Error(result.error||'The AI request could not be completed.');
+  pending.textContent=result.answer;pending.classList.remove('pending');
+  aiMessages.push({role:'assistant',content:result.answer});
+ }catch(error){
+  aiMessages.pop();
+  pending.textContent=error.message||'Could not connect to the AI service. Try again.';pending.classList.remove('pending','assistant');pending.classList.add('error');
+  if(/not configured|API key/i.test(error.message||''))updateAiAvailability(false);
+ }finally{aiBusy=false;updateAiAvailability(aiConfigured);$('#ai-input').focus()}
+}
+$('#ai-form').onsubmit=event=>{event.preventDefault();sendAiMessage($('#ai-input').value)};
+$('#ai-input').onkeydown=event=>{if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();$('#ai-form').requestSubmit()}};
+$('#ai-suggestions').querySelectorAll('[data-ai-prompt]').forEach(button=>button.onclick=()=>sendAiMessage(button.dataset.aiPrompt));
+function showAiPanel(open){
+ $('#ai-panel').hidden=!open;$('#ai-launcher').setAttribute('aria-expanded',String(open));
+ if(open)$('#ai-close').focus();else $('#ai-launcher').focus();
+}
+$('#ai-launcher').onclick=()=>showAiPanel($('#ai-panel').hidden);
+$('#ai-close').onclick=()=>showAiPanel(false);
+document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!$('#ai-panel').hidden)showAiPanel(false)});
+checkAiAvailability();
 rebuildRouteOptions(false);
 ['ra','rb'].forEach(id=>$('#'+id).onchange=()=>{fitNextRoute=true;const stop=routeStop($('#'+id).value);if(stop)showCoordinates(L.latLng(stop.lat,stop.lon),id==='ra'?'Route start':'Route destination');routeUI()});
 $('#pick-route-start').onclick=()=>beginMapRoutePick('from');

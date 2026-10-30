@@ -31,7 +31,7 @@
       aria-expanded="false"
       aria-controls="notification-panel"
     >
-      <span>🔔</span>
+      <span aria-hidden="true">🔔</span>
       <span id="notification-count" class="notification-count" hidden>0</span>
     </button>
 
@@ -43,7 +43,7 @@
         </button>
       </div>
 
-      <div id="notification-list">
+      <div class="notification-list" id="notification-list">
         <p>No notifications yet.</p>
       </div>
     </div>
@@ -69,6 +69,7 @@
   <div class="pn" id="p-rep" hidden>
    <div class='two' style='grid-template-columns:1fr auto auto'><input class='in' id='vt' placeholder='Say or type it: ಗುಂಡಿ, गड्ढा, pothole' aria-label='Describe the issue'><select id='lg' aria-label='Language'><option value='en-IN'>English</option><option value='hi-IN'>हिन्दी</option><option value='kn-IN'>ಕನ್ನಡ</option></select><button class='sm' id='mic' style='margin:0' aria-label='Speak'>🎤</button></div>
    <p id="pst" class="mu"></p>
+   <button class="sm report-pick-btn" id="pick-report-location" type="button" aria-pressed="false">Choose location on map</button>
    <div class="report-coords" id="report-coords" aria-live="polite">Tap the map to set a pin and see its coordinates.</div>
    <div class="chips" id="chips"></div>
    <input type="file" id="ph" accept="image/*" aria-label="Attach a photo">
@@ -94,6 +95,20 @@
   <div class='pn' id='p-hist' hidden><div class='history-heading'><div><strong>Completed tasks</strong><p class='mu'>Fixes you marked complete on this device.</p></div><span class='history-total' id='history-total'>0</span></div><div id='history-list' aria-live='polite'></div></div>
  </aside>
 </main>
+<div class='ai-widget'>
+ <section class='ai-panel' id='ai-panel' role='dialog' aria-labelledby='ai-title' aria-modal='false' hidden>
+  <div class='ai-panel-header'><div class='ai-heading'><div><span class='ai-kicker'>ACCESS COPILOT</span><h2 id='ai-title'>Ask about this street</h2><p class='mu'>Priorities, accessibility impacts, next steps.</p></div><div class='ai-header-actions'><span class='ai-status' id='ai-status'>Checking AI…</span><button class='ai-close' id='ai-close' type='button' aria-label='Close AI chat'>×</button></div></div></div>
+  <div class='ai-panel-content'>
+   <div class='ai-setup' id='ai-setup' hidden><strong>Connect your AI key to turn on the copilot.</strong><span>Create a local <code>.env</code> file from <code>.env.example</code>, add your OpenRouter API key, then restart the app. The key stays on your computer.</span></div>
+   <div class='ai-privacy'>When you ask a question, OpenRouter and the selected model provider receive your message and a short issue summary. Map coordinates, photos, and route endpoints are excluded.</div>
+   <div class='ai-suggestions' id='ai-suggestions'><button type='button' data-ai-prompt='What should we fix first for the selected persona, and why?'>What should we fix first?</button><button type='button' data-ai-prompt='Which open issues affect wheelchair users most? Explain using the board data.'>Help wheelchair users</button><button type='button' data-ai-prompt='Write a short, practical ward briefing from the current issue board.'>Draft a ward briefing</button></div>
+   <div class='ai-thread' id='ai-thread' role='log' aria-live='polite' aria-relevant='additions'><div class='ai-message assistant'>Hi, I’m the Access Copilot. I can explain the live issue ranking and suggest practical next steps.</div></div>
+   <form class='ai-form' id='ai-form'><textarea id='ai-input' maxlength='1200' rows='2' placeholder='Ask about priorities, personas, or the issue board…' aria-label='Ask the AI Access Copilot'></textarea><button class='btn' id='ai-send' type='submit' disabled>Ask AI</button></form>
+   <p class='ai-note'>Suggestions are advisory. They do not change scores, routes, reports, or task history. Demo issue data may not describe verified conditions.</p>
+  </div>
+ </section>
+ <button class='ai-launcher' id='ai-launcher' type='button' aria-controls='ai-panel' aria-expanded='false' aria-haspopup='dialog'><span class='ai-launcher-icon' aria-hidden='true'>✳</span><span>Access AI</span></button>
+</div>
 <div id='brief'></div><div id="toast" role="status"></div>
   <script type="module" src="/src/main.js"></script>
 </body>

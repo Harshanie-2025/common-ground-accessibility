@@ -5,19 +5,19 @@ let notifications = [];
 
 function loadNotifications() {
   try {
-    notifications = JSON.parse(
-      localStorage.getItem(STORAGE_KEY) || '[]'
-    );
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    notifications = Array.isArray(saved) ? saved.slice(0, 50) : [];
   } catch {
     notifications = [];
   }
 }
 
 function saveNotifications() {
-  localStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify(notifications)
-  );
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(notifications));
+  } catch {
+    // Keep the in-memory list usable if browser storage is blocked or full.
+  }
 }
 
 export function getNotifications() {
