@@ -30,13 +30,4 @@ A clickable civic accessibility dashboard prototype for the hackathon problem st
 
 The demo score is `severity (up to 45) + community reports (up to 24) + time unresolved (up to 17) + persona impact (8 or 30)`, capped at 99. It is an explainable hackathon heuristic, not a city policy or an official allocation decision.
 
-## Good 24-hour hackathon extensions
 
-1. Replace the schematic with an OpenStreetMap/Leaflet map and a real study-area boundary.
-2. Persist reports in Supabase or Firebase and add a municipal staff workflow for triage and completion.
-3. Add photo-based issue suggestions, with a human confirming the category and severity.
-4. Add route accessibility: show how a barrier disrupts a useful trip (bus stop, school, clinic) for each persona.
-5. Add multilingual voice reporting, anonymous participation, and an accessible, screen-reader-tested report flow.
-6. Validate the priority model with disabled residents and publish the weights, uncertainty, and appeal process.
-
-The prototype is frontend-only and intentionally seeds demo data; reports live in browser memory and reset on refresh.
