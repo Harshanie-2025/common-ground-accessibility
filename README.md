@@ -1,33 +1,45 @@
-# Common Ground — The Last 100 Metres
+# Last 100 m — One Street, Four Realities
 
-A clickable civic accessibility dashboard prototype for the hackathon problem statement **“The Last 100 Metres: One Street, Four Realities.”** The demo uses a locally drawn neighborhood map, so no map key or backend is needed.
+Standalone Vite project converted from the supplied single-file HTML prototype. No backend or map key is required. Satellite imagery uses Esri World Imagery, and the browser asks for location access so it can center the map on you. If you deny access, the app shows a labeled Bengaluru demo area instead.
 
 ## Run it
 
-1. Install Node.js (20 or newer).
-2. Open this folder in VS Code and open **Terminal → New Terminal**.
-3. Run:
+Requires Node.js 20 or newer. In a terminal:
 
-   ```bash
-   npm install
-   npm run dev
-   ```
+```bash
+cd /Users/nookaharshavardhan/Documents/Codex/Last-100-Metres
+npm install
+npm run dev
+```
 
-4. Open the local address printed by Vite (usually `http://localhost:5173`).
+Open the local address printed by Vite. Location access works on `localhost` or HTTPS. Esri receives satellite tile requests for the area visible in the map. To build a deployable version, run `npm run build`.
 
-## Implemented in this prototype
+## Features
 
-- Responsive, map-first accessibility dashboard for a 2.4 km² study area.
-- Twelve seeded street barriers with map pins, status, severity, reports, and persona impacts.
-- Four persona switches (wheelchair user, older adult, low vision, parent with stroller) that immediately change issue priority scores and queue order.
-- Report form with issue category, severity, affected personas, optional photo, description, and map pin placement. New reports appear immediately.
-- Nearby duplicate detection for the same category; matching reports merge into the existing issue and increase its report count.
-- Click an issue to see its explanation and confirm it; search and status filters update the map and queue.
-- Top 10 fixes view with plain-language reasons and the transparent demo scoring formula.
-- Responsive styling and reduced-motion support.
+- Esri satellite map centered on your browser location, with a Bengaluru demo fallback, selectable issue pins, and visible latitude/longitude. The schematic street grid is omitted from the satellite view.
+- Four accessibility personas plus an everyone view; scores and rankings respond to the selected person.
+- Plain-language Top 10 queue and a breakdown of impact, nearby footfall, confirmations, and time unresolved.
+- Report categories, map pin, photo attachment, multilingual text classification, and optional browser speech recognition in English, Hindi, and Kannada.
+- Nearby duplicate detection and merging.
+- Route planning between a hospital, school, bus stop, market, and metro station, with barriers and possible unblock fixes.
+- A rupee-denominated repair budget planner ranked by priority per rupee, including a comparison of remaining barrier load for all four personas.
+- Confirm a repair, attach an after photo, view a before/after comparison, and print a ward brief.
+- Responsive layout, system dark mode, keyboard focus styles, and reduced-motion support.
 
-## Score model
+## Source structure
 
-The demo score is `severity (up to 45) + community reports (up to 24) + time unresolved (up to 17) + persona impact (8 or 30)`, capped at 99. It is an explainable hackathon heuristic, not a city policy or an official allocation decision.
+```text
+Last-100-Metres/
+├── index.html
+├── package.json
+├── README.md
+└── src/
+    ├── main.js        # App state, UI rendering, and interactions
+    ├── styles.css     # Layout, theme, and responsive styles
+    ├── data.js        # Personas, issue seeds, places, and repair costs
+    ├── scoring.js     # Priority scoring and explanations
+    ├── streets.js     # Study-area route graph and routing utilities
+    └── reporting.js   # English, Hindi, and Kannada issue suggestions
+```
 
-
+The score is an explainable demo heuristic. Reports and photo previews stay in browser memory and reset when the page is refreshed. Speech recognition depends on browser support and microphone permission.
