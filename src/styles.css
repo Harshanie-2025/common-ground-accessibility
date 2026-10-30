@@ -191,3 +191,66 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--ac);outline-off
 .notification-count[hidden] {
   display: none;
 }
+
+/* ===== Dashboard Analytics ===== */
+
+.dashboard-cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin: 20px 0;
+}
+
+.dashboard-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.dashboard-card span {
+    color: #64748b;
+    font-size: 14px;
+}
+
+.dashboard-card strong {
+    font-size: 28px;
+    color: #1e293b;
+}
+
+.chart-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 20px;
+    margin: 20px 0;
+}
+
+.chart-card h3 {
+    margin: 0 0 20px;
+    color: #1e293b;
+    font-size: 17px;
+}
+
+.chart-card canvas {
+    width: 100% !important;
+    height: 280px !important;
+}
+
+/* Responsive dashboard */
+@media (max-width: 700px) {
+    .dashboard-cards {
+        grid-template-columns: 1fr;
+    }
+
+    .chart-card {
+        padding: 12px;
+    }
+
+    .chart-card canvas {
+        height: 240px !important;
+    }
+}

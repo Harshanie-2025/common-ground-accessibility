@@ -6,8 +6,10 @@
   <meta name="theme-color" content="#e8eef0">
   <meta name="description" content="An accessibility-first street repair planner for four lived realities.">
   <title>Last 100 m — One street, four realities</title>
+
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&display=swap">
 </head>
+
 <body>
 
 <header>
@@ -51,50 +53,217 @@
 </header>
 
 <main>
- <section class="mapc">
-  <div class="st">
-   <div><b id="s1"></b><span>open issues</span></div>
-   <div><b id="s2"></b><span id="s2l"></span></div>
-   <div><b id="s3">0</b><span>duplicates merged</span></div>
-   <div class="vw" id="vw"></div>
-  </div>
-  <div class="mapbar"><span id="locstatus" aria-live="polite">Loading satellite imagery…</span><button class="sm" id="locate" type="button">◎ Use my location</button></div>
-  <div id="map" role="application" aria-label="Satellite map. Select a point to report an accessibility issue."></div>
-  <div class="coordbar" aria-live="polite"><span id="mapcoord-label">Selected location</span><code id="mapcoord">Select a point on the map</code></div>
-  <div class="lg"><span style="--k:var(--c1)">Critical 75+</span><span style="--k:var(--c2)">High 55+</span><span style="--k:var(--c3)">Medium 35+</span><span style="--k:var(--c4)">Low</span><span style="--k:var(--ink)">Sample issues</span><span style="--k:var(--ac)">Tap the map to report</span></div>
- </section>
- <aside>
-  <div class="tabs"><button data-t="top" class="on">Top 10 fixes</button><button data-t="rep">Report</button><button data-t="det">Issue</button><button data-t="rt">Route</button><button data-t="plan">Plan</button><button data-t="hist">History <span class="tab-count" id="history-count">0</span></button></div>
-  <div class="pn" id="p-top"><p class="mu" id="note"></p><ol id="top"></ol></div>
-  <div class="pn" id="p-rep" hidden>
-   <div class='two' style='grid-template-columns:1fr auto auto'><input class='in' id='vt' placeholder='Say or type it: ಗುಂಡಿ, गड्ढा, pothole' aria-label='Describe the issue'><select id='lg' aria-label='Language'><option value='en-IN'>English</option><option value='hi-IN'>हिन्दी</option><option value='kn-IN'>ಕನ್ನಡ</option></select><button class='sm' id='mic' style='margin:0' aria-label='Speak'>🎤</button></div>
-   <p id="pst" class="mu"></p>
-   <div class="report-coords" id="report-coords" aria-live="polite">Tap the map to set a pin and see its coordinates.</div>
-   <div class="chips" id="chips"></div>
-   <input type="file" id="ph" accept="image/*" aria-label="Attach a photo">
-   <img class="pv" id="pv" alt="" hidden>
-   <button class="btn" id="go" disabled>Submit report</button>
-   <button class="btn g" id="dup">Try a duplicate report</button>
-  </div>
-  <div class="pn" id="p-det" hidden></div>
-  <div class='pn' id='p-rt' hidden>
-   <p class='mu' id='rtn' aria-live='polite'></p>
-   <div class='route-tools'>
-    <strong>Route between any two places</strong>
-    <div class='two route-pick-actions'><button class='sm' id='pick-route-start' type='button'>Set start on map</button><button class='sm' id='pick-route-end' type='button'>Set destination on map</button></div>
-    <label class='route-search-label' for='route-query'>Or search any address or place</label>
-    <div class='two route-search-row'><input class='in' id='route-query' type='search' maxlength='180' placeholder='Street, landmark, address…'><button class='sm' id='route-search' type='button'>Search</button></div>
-    <div class='route-search-results' id='route-search-results' aria-live='polite'></div>
-    <small class='route-source'>OpenStreetMap place-search matches may be incomplete. © OpenStreetMap contributors.</small>
-   </div>
-   <div class='two'><select id='ra' aria-label='Route start'></select><select id='rb' aria-label='Route destination'></select></div>
-   <div class='res' id='rres' aria-live='polite'></div>
-  </div>
-  <div class='pn' id='p-plan' hidden><p class='mu'>Set a repair budget. The plan picks the fixes that give the most relief per rupee for the persona above.</p><input type='range' id='bud' min='0' max='150000' step='5000' value='50000' aria-label='Repair budget'><div id='pres'></div></div>
-  <div class='pn' id='p-hist' hidden><div class='history-heading'><div><strong>Completed tasks</strong><p class='mu'>Fixes you marked complete on this device.</p></div><span class='history-total' id='history-total'>0</span></div><div id='history-list' aria-live='polite'></div></div>
- </aside>
+
+  <!-- Map Section -->
+  <section class="mapc">
+
+    <div class="st">
+      <div><b id="s1"></b><span>open issues</span></div>
+      <div><b id="s2"></b><span id="s2l"></span></div>
+      <div><b id="s3">0</b><span>duplicates merged</span></div>
+      <div class="vw" id="vw"></div>
+    </div>
+
+    <div class="mapbar">
+      <span id="locstatus" aria-live="polite">Loading satellite imagery…</span>
+      <button class="sm" id="locate" type="button">◎ Use my location</button>
+    </div>
+
+    <div id="map" role="application" aria-label="Satellite map. Select a point to report an accessibility issue."></div>
+
+    <div class="coordbar" aria-live="polite">
+      <span id="mapcoord-label">Selected location</span>
+      <code id="mapcoord">Select a point on the map</code>
+    </div>
+
+    <div class="lg">
+      <span style="--k:var(--c1)">Critical 75+</span>
+      <span style="--k:var(--c2)">High 55+</span>
+      <span style="--k:var(--c3)">Medium 35+</span>
+      <span style="--k:var(--c4)">Low</span>
+      <span style="--k:var(--ink)">Sample issues</span>
+      <span style="--k:var(--ac)">Tap the map to report</span>
+    </div>
+
+  </section>
+
+  <!-- Sidebar -->
+  <aside>
+
+    <!-- Navigation Tabs -->
+    <div class="tabs">
+      <button data-t="top" class="on">Top 10 fixes</button>
+      <button data-t="rep">Report</button>
+      <button data-t="det">Issue</button>
+      <button data-t="rt">Route</button>
+      <button data-t="plan">Plan</button>
+      <button data-t="hist">History <span class="tab-count" id="history-count">0</span></button>
+      <button data-t="dash">Dashboard</button>
+    </div>
+
+    <!-- Top 10 Fixes -->
+    <div class="pn" id="p-top">
+      <p class="mu" id="note"></p>
+      <ol id="top"></ol>
+    </div>
+
+    <!-- Report Section -->
+    <div class="pn" id="p-rep" hidden>
+
+      <div class="two" style="grid-template-columns:1fr auto auto">
+        <input class="in" id="vt" placeholder="Say or type it: ಗುಂಡಿ, गड्ढा, pothole" aria-label="Describe the issue">
+
+        <select id="lg" aria-label="Language">
+          <option value="en-IN">English</option>
+          <option value="hi-IN">हिन्दी</option>
+          <option value="kn-IN">ಕನ್ನಡ</option>
+        </select>
+
+        <button class="sm" id="mic" style="margin:0" aria-label="Speak">🎤</button>
+      </div>
+
+      <p id="pst" class="mu"></p>
+
+      <div class="report-coords" id="report-coords" aria-live="polite">
+        Tap the map to set a pin and see its coordinates.
+      </div>
+
+      <div class="chips" id="chips"></div>
+
+      <input type="file" id="ph" accept="image/*" aria-label="Attach a photo">
+
+      <img class="pv" id="pv" alt="" hidden>
+
+      <button class="btn" id="go" disabled>Submit report</button>
+      <button class="btn g" id="dup">Try a duplicate report</button>
+
+    </div>
+
+    <!-- Issue Details -->
+    <div class="pn" id="p-det" hidden></div>
+
+    <!-- Route Section -->
+    <div class="pn" id="p-rt" hidden>
+
+      <p class="mu" id="rtn" aria-live="polite"></p>
+
+      <div class="route-tools">
+        <strong>Route between any two places</strong>
+
+        <div class="two route-pick-actions">
+          <button class="sm" id="pick-route-start" type="button">Set start on map</button>
+          <button class="sm" id="pick-route-end" type="button">Set destination on map</button>
+        </div>
+
+        <label class="route-search-label" for="route-query">
+          Or search any address or place
+        </label>
+
+        <div class="two route-search-row">
+          <input class="in" id="route-query" type="search" maxlength="180" placeholder="Street, landmark, address…">
+          <button class="sm" id="route-search" type="button">Search</button>
+        </div>
+
+        <div class="route-search-results" id="route-search-results" aria-live="polite"></div>
+
+        <small class="route-source">
+          OpenStreetMap place-search matches may be incomplete. © OpenStreetMap contributors.
+        </small>
+      </div>
+
+      <div class="two">
+        <select id="ra" aria-label="Route start"></select>
+        <select id="rb" aria-label="Route destination"></select>
+      </div>
+
+      <div class="res" id="rres" aria-live="polite"></div>
+
+    </div>
+
+    <!-- Planning Section -->
+    <div class="pn" id="p-plan" hidden>
+
+      <p class="mu">
+        Set a repair budget. The plan picks the fixes that give the most relief per rupee for the persona above.
+      </p>
+
+      <input type="range" id="bud" min="0" max="150000" step="5000" value="50000" aria-label="Repair budget">
+
+      <div id="pres"></div>
+
+    </div>
+
+    <!-- History Section -->
+    <div class="pn" id="p-hist" hidden>
+
+      <div class="history-heading">
+        <div>
+          <strong>Completed tasks</strong>
+          <p class="mu">Fixes you marked complete on this device.</p>
+        </div>
+
+        <span class="history-total" id="history-total">0</span>
+      </div>
+
+      <div id="history-list" aria-live="polite"></div>
+
+    </div>
+
+    <!-- Dashboard Analytics -->
+    <div class="pn" id="p-dash" hidden>
+
+      <h2>Issue Analytics</h2>
+
+      <p class="mu">
+        Overview of accessibility issues in your area.
+      </p>
+
+      <!-- Summary Cards -->
+      <div class="dashboard-cards">
+
+        <div class="dashboard-card">
+          <span>Total Issues</span>
+          <strong id="dash-total">0</strong>
+        </div>
+
+        <div class="dashboard-card">
+          <span>Fixed Issues</span>
+          <strong id="dash-fixed">0</strong>
+        </div>
+
+        <div class="dashboard-card">
+          <span>Pending Issues</span>
+          <strong id="dash-pending">0</strong>
+        </div>
+
+      </div>
+
+      <!-- Doughnut Chart -->
+      <div class="chart-card">
+        <h3>Issue Status Distribution</h3>
+        <canvas id="status-chart"></canvas>
+      </div>
+
+      <!-- Bar Chart -->
+      <div class="chart-card">
+        <h3>Reported vs Fixed vs Pending</h3>
+        <canvas id="comparison-chart"></canvas>
+      </div>
+
+    </div>
+
+  </aside>
+
 </main>
-<div id='brief'></div><div id="toast" role="status"></div>
-  <script type="module" src="/src/main.js"></script>
+
+<div id="brief"></div>
+<div id="toast" role="status"></div>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<!-- Application JavaScript -->
+<script type="module" src="/src/main.js"></script>
+
 </body>
 </html>
