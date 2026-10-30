@@ -54,6 +54,7 @@ main{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(330px,1fr);gap:1
 .route-empty,.route-loading,.route-error{display:grid;gap:8px;padding:16px;background:var(--bg);border-radius:16px;color:var(--mu)}
 .route-empty strong,.route-error strong{color:var(--ink)}.route-empty span,.route-error span,.route-loading small{font-size:13px}
 .route-error{border:1px solid color-mix(in srgb,var(--c1) 35%,var(--ln))}.route-error .sm{justify-self:start}
+.route-tools{display:grid;gap:8px;margin:10px 0;padding:13px;background:var(--bg);border-radius:16px}.route-tools>strong{font-size:14px}.route-search-label{color:var(--mu);font-size:12px;font-weight:600}.route-pick-actions,.route-search-row{margin:0;align-items:center}.route-search-row .sm{margin:0;white-space:nowrap}.route-pick-actions .sm{margin:0;font-size:12px;padding:8px 9px}.route-pick-actions .sm.active{background:var(--ink);color:var(--bg)}.route-search-results{display:grid;gap:8px}.place-result{display:grid;gap:8px;padding:11px;background:var(--sf);border:1px solid var(--ln);border-radius:13px}.place-result>div:first-child{display:grid;gap:2px}.place-result small{color:var(--mu);font-size:11px;overflow-wrap:anywhere}.place-result-actions{display:flex;gap:6px}.place-result-actions .sm{margin:0;padding:7px 10px;font-size:12px}.route-picking{cursor:crosshair!important;outline:3px dashed var(--ac);outline-offset:-5px}.route-empty .sm{justify-self:start}.route-empty small{font-size:11px}
 .route-loading{grid-template-columns:22px 1fr;align-items:center}.route-loading small{grid-column:2}
 .spinner{width:18px;height:18px;border:2px solid var(--ln);border-top-color:var(--ac);border-radius:50%;animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -68,6 +69,7 @@ aside{padding:8px 8px 14px;max-height:calc(100vh - 110px);overflow:auto}
 .tabs{display:flex;gap:4px;padding:6px}
 .tabs button{flex:1;border:0;background:none;padding:10px;border-radius:14px;font-weight:600;color:var(--mu)}
 .tabs button.on{background:var(--bg);color:var(--ink)}
+.tab-count{display:inline-grid;place-items:center;min-width:20px;height:20px;margin-left:2px;padding:0 5px;border-radius:999px;background:var(--gr);font-size:11px}
 .pn{padding:6px 14px}
 .mu{color:var(--mu)}
 ol{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}
@@ -100,6 +102,7 @@ code{display:block;background:var(--bg);padding:10px 12px;border-radius:12px;fon
 select,.in{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--ln);border-radius:12px;padding:9px 10px;width:100%}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}
 .res{background:var(--bg);border-radius:16px;padding:14px;margin:10px 0}.res strong{font-size:17px}
+.history-heading{display:flex;align-items:center;justify-content:space-between;padding:8px 3px}.history-heading strong{font-size:18px}.history-heading p{margin:2px 0;font-size:13px}.history-total{display:grid;place-items:center;min-width:38px;height:38px;border-radius:13px;background:var(--gr);font-weight:800}.history-list{display:grid;gap:9px}.history-card{width:100%;display:grid;grid-template-columns:1fr auto;gap:8px;text-align:left;padding:13px;border:1px solid var(--ln);border-radius:15px;background:var(--bg)}.history-card:hover{border-color:var(--c4)}.history-card strong{display:block}.history-card small{display:block;margin-top:3px;color:var(--mu);font-size:12px}.history-status{align-self:start;padding:5px 8px;border-radius:999px;background:color-mix(in srgb,var(--c4) 15%,var(--bg));color:var(--c4);font-size:11px;font-weight:800}.history-empty{padding:16px;border:1px dashed var(--ln);border-radius:15px;color:var(--mu);font-size:13px}
 .sm{border:1px solid var(--ln);background:var(--bg);border-radius:12px;padding:9px 12px;font-weight:600;margin:6px 6px 0 0}.sm.f{background:var(--c4);color:#fff;border-color:var(--c4)}
 .cmp{position:relative;height:160px;border-radius:14px;overflow:hidden;margin:8px 0}.cmp>*{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;margin:0}
 input[type=range]{width:100%;accent-color:var(--ac)}

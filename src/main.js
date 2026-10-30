@@ -8,14 +8,18 @@ import { guessIssueCategory } from './reporting.js';
 const $=s=>document.querySelector(s);
 const K=CATEGORY_KEYS,T=ISSUE_TITLES;
 const P=Object.fromEntries(Object.entries(PERSONAS).map(([key,p])=>[key,{n:p.name,s:p.plural,e:p.icon,w:p.weights}]));
+const HISTORY_KEY='last100m.completedTasks.v1';
+function readHistory(){try{const rows=JSON.parse(localStorage.getItem(HISTORY_KEY)||'[]');return Array.isArray(rows)?rows.filter(r=>r&&Number.isFinite(Number(r.issueId))&&Number.isFinite(Number(r.lat))&&Number.isFinite(Number(r.lon))).slice(0,200):[]}catch{return[]}}
+let historyRecords=readHistory();
 const issues=createSeedIssues().map(i=>({id:i.id,t:i.type,type:i.type,x:i.x,y:i.y,n:i.reports,reports:i.reports,age:i.age,mg:i.merged}));
+function restoreCompletedIssues(){issues.forEach(i=>{delete i.fx;delete i.completedAt});for(const record of historyRecords){if(distanceMeters({lat:record.baseLat??DEMO_CENTER.lat,lng:record.baseLon??DEMO_CENTER.lng},origin)>1000)continue;const issue=issues.find(i=>i.id===Number(record.issueId)&&i.t===record.type&&i.x===record.x&&i.y===record.y);if(issue){issue.fx=true;issue.completedAt=record.completedAt}}}
 let ps='wheel',cur=0,merged=0,rep={};
 const band=priorityBand;
 const sc=(issue,persona=ps)=>calculateScore(issue,persona,schools.length?scorePlaces():undefined);
 const why=(issue,breakdown)=>explainScore(issue,breakdown,ps);
 const map=$('#map'),DEMO_CENTER={lat:12.9716,lng:77.5946},METERS_PER_UNIT=2.5;
-let origin={...DEMO_CENTER},located=false,userMarker=null,reportMarker=null,schools=[],schoolRequest=0,fitNextRoute=false,schoolLookupKey='',schoolLookupAt=0,schoolLookupReady=false,schoolLookupPending=false,schoolSearchPending=false,schoolSearchError='',schoolSource='';
-let lastNominatimSearchAt=0;
+let origin={...DEMO_CENTER},located=false,userMarker=null,reportMarker=null,schools=[],schoolRequest=0,fitNextRoute=false,schoolLookupKey='',schoolLookupAt=0,schoolLookupReady=false,schoolLookupPending=false,schoolSearchPending=false,schoolSearchError='',schoolSource='',routePins={from:null,to:null},mapPickTarget=null,placeResults=[],placeSearchPending=false,placeSearchError='',nominatimBusy=false,lastNominatimSearchAt=0;
+restoreCompletedIssues();
 const routeCache=new Map(),routePending=new Map();
 const geoMap=L.map(map,{zoomControl:true,scrollWheelZoom:false,preferCanvas:true}).setView([origin.lat,origin.lng],15);
 geoMap.createPane('routePane');geoMap.getPane('routePane').style.zIndex=450;
@@ -51,12 +55,12 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 function schoolKind(s){return s.govt&&s.primary?'Government primary school':s.govt?'Government school':s.primary?'Primary school':'School'}
 function rebuildRouteOptions(keep=true){
  const oldA=$('#ra').value,oldB=$('#rb').value;
- const stops=[{id:'current',name:located?'My location':'Bengaluru demo center',lat:origin.lat,lon:origin.lng,kind:located?'Your location':'Demo map center'},...schools];
- const options=stops.map(s=>`<option value="${esc(s.id)}">${esc(s.id==='current'?s.name:`${s.name} · ${schoolKind(s)}`)}</option>`).join('');
+ const stops=[{id:'current',name:located?'My location':'Bengaluru demo center',lat:origin.lat,lon:origin.lng,kind:located?'Your location':'Demo map center'},...Object.values(routePins).filter(Boolean),...schools];
+ const options=stops.map(s=>{const label=s.id==='current'?s.name:s.id.startsWith('school-')?`${s.name} · ${schoolKind(s)}`:s.name;return`<option value="${esc(s.id)}">${esc(label)}</option>`}).join('');
  ['ra','rb'].forEach(id=>{$('#'+id).innerHTML=options});
  const primary=schools.find(s=>s.primary)||schools.find(s=>s.govt)||schools[0];
- $('#ra').value=keep&&stops.some(s=>s.id===oldA)?oldA:'current';
- $('#rb').value=keep&&stops.some(s=>s.id===oldB)?oldB:(primary?.id||'current');
+ $('#ra').value=keep&&stops.some(s=>s.id===oldA)?oldA:(routePins.from?.id||'current');
+ $('#rb').value=keep&&stops.some(s=>s.id===oldB)?oldB:(routePins.to?.id||primary?.id||'current');
  if($('#rb').value==='current'&&schools.length)$('#rb').value=schools[0].id;
 }
 function classifySchool(tags={}){
@@ -112,19 +116,19 @@ async function loadNearbySchools(center){
   if(!$('#p-rt').hidden)routeUI();
  }
 }
+async function reserveNominatimSlot(){const wait=Math.max(0,1000-(Date.now()-lastNominatimSearchAt));if(wait)await new Promise(resolve=>setTimeout(resolve,wait));lastNominatimSearchAt=Date.now()}
 async function searchNearbySchoolMatches(){
  if(!located||schoolSearchPending)return;
- schoolSearchPending=true;schoolSearchError='';
+ if(nominatimBusy){toast('Wait for the current OpenStreetMap search to finish.');return}
+ nominatimBusy=true;schoolSearchPending=true;schoolSearchError='';
  if(!$('#p-rt').hidden)routeUI();
- const wait=Math.max(0,1000-(Date.now()-lastNominatimSearchAt));
- if(wait)await new Promise(resolve=>setTimeout(resolve,wait));
- lastNominatimSearchAt=Date.now();
  try{
+  await reserveNominatimSlot();
   // This is a user-triggered, bounded search. Nominatim returns best matches,
   // not a complete inventory of every school in the area.
   const latDelta=5000/111320,lonDelta=5000/(111320*Math.cos(origin.lat*Math.PI/180));
   const params=new URLSearchParams({amenity:'school',format:'jsonv2',limit:'20',viewbox:[origin.lng-lonDelta,origin.lat+latDelta,origin.lng+lonDelta,origin.lat-latDelta].join(','),bounded:'1',extratags:'1','accept-language':'en'});
-  const response=await fetch(`https://nominatim.openstreetmap.org/search?${params}`,{headers:{Accept:'application/json'},referrerPolicy:'origin',signal:AbortSignal.timeout(15000)});
+  const response=await fetch(`https://nominatim.openstreetmap.org/search?${params}`,{headers:{Accept:'application/json'},referrerPolicy:'unsafe-url',signal:AbortSignal.timeout(15000)});
   if(!response.ok)throw new Error(`OpenStreetMap search returned ${response.status}.`);
   const data=await response.json();
   schools=(data||[]).map(e=>{
@@ -140,7 +144,44 @@ async function searchNearbySchoolMatches(){
   if(schools.length)toast(`Found ${schools.length} OpenStreetMap school matches. Results may be incomplete.`);
   else toast('No school matches found in this area. Try again later or choose another location.');
  }catch(error){schoolSearchError=error.message||'The OpenStreetMap school search is temporarily unavailable.';$('#locstatus').textContent='Satellite view near you · school search unavailable'}
- finally{schoolSearchPending=false;if(!$('#p-rt').hidden)routeUI()}
+ finally{schoolSearchPending=false;nominatimBusy=false;if(!$('#p-rt').hidden)routeUI()}
+}
+function renderPlaceSearch(){
+ const box=$('#route-search-results');if(!box)return;
+ if(placeSearchPending){box.innerHTML='<div class="route-loading"><span class="spinner"></span><strong>Searching OpenStreetMap…</strong><small>Search results are public map matches.</small></div>';return}
+ if(placeSearchError){box.innerHTML=`<div class="route-error"><span>${esc(placeSearchError)}</span></div>`;return}
+ if(!placeResults.length){box.innerHTML='';return}
+ box.innerHTML=placeResults.map((place,index)=>`<div class="place-result"><div><strong>${esc(place.name)}</strong><small>${esc(place.address)}<br>${esc(coordText(L.latLng(place.lat,place.lon)))}</small></div><div class="place-result-actions"><button class="sm" data-place-index="${index}" data-place-slot="from" type="button">Use as start</button><button class="sm" data-place-index="${index}" data-place-slot="to" type="button">Use as destination</button></div></div>`).join('');
+ box.querySelectorAll('[data-place-index]').forEach(button=>button.onclick=()=>assignRoutePlace(button.dataset.placeSlot,placeResults[Number(button.dataset.placeIndex)]));
+}
+async function searchRoutePlace(){
+ const query=$('#route-query').value.trim();if(!query){toast('Enter an address or place to search.');$('#route-query').focus();return}
+ if(placeSearchPending)return;
+ if(nominatimBusy){toast('Wait for the current OpenStreetMap search to finish.');return}
+ nominatimBusy=true;placeSearchPending=true;placeSearchError='';placeResults=[];renderPlaceSearch();
+ try{
+  await reserveNominatimSlot();
+  const params=new URLSearchParams({q:query,format:'jsonv2',limit:'5','accept-language':'en'});
+  const bounds=geoMap.getBounds();if(bounds.isValid())params.set('viewbox',[bounds.getWest(),bounds.getNorth(),bounds.getEast(),bounds.getSouth()].join(','));
+  const response=await fetch(`https://nominatim.openstreetmap.org/search?${params}`,{headers:{Accept:'application/json'},referrerPolicy:'unsafe-url',signal:AbortSignal.timeout(15000)});
+  if(!response.ok)throw new Error(`OpenStreetMap search returned ${response.status}.`);
+  const data=await response.json();
+  placeResults=(data||[]).map((item,index)=>({id:`place-${item.osm_type}-${item.osm_id}-${index}`,name:item.name||item.display_name?.split(',')[0]||'Map result',address:item.display_name||'',lat:Number(item.lat),lon:Number(item.lon),kind:'Place'})).filter(item=>Number.isFinite(item.lat)&&Number.isFinite(item.lon));
+  if(!placeResults.length)placeSearchError='No matching place was found. Try a fuller address or choose a point on the map.';
+ }catch(error){placeSearchError=error.message||'The OpenStreetMap place search is temporarily unavailable.'}
+ finally{placeSearchPending=false;nominatimBusy=false;renderPlaceSearch()}
+}
+function assignRoutePlace(slot,place){
+ if(!place)return;
+ const id=`route-${slot}`;routePins[slot]={id,name:place.name,kind:'Place',lat:place.lat,lon:place.lon,source:place.address||'OpenStreetMap'};
+ rebuildRouteOptions(true);$('#r'+slot).value=id;fitNextRoute=true;
+ const ll=L.latLng(place.lat,place.lon);showCoordinates(ll,slot==='from'?'Route start':'Route destination');geoMap.panTo(ll);tab('rt');routeUI();
+}
+function beginMapRoutePick(slot){tab('rt');mapPickTarget=slot;document.querySelectorAll('.route-pick-actions .active').forEach(button=>button.classList.remove('active'));$('#map').classList.add('route-picking');$('#pick-route-'+(slot==='from'?'start':'end')).classList.add('active');toast(`Tap the map to set the route ${slot==='from'?'start':'destination'}.`)}
+function setMapRoutePoint(slot,ll){
+ const id=`route-${slot}`;routePins[slot]={id,name:`Map point · ${coordText(ll)}`,kind:'Map point',lat:ll.lat,lon:ll.lng,source:'Map pin'};
+ rebuildRouteOptions(true);$('#r'+slot).value=id;fitNextRoute=true;showCoordinates(ll,slot==='from'?'Route start':'Route destination');
+ mapPickTarget=null;$('#map').classList.remove('route-picking');document.querySelectorAll('.route-pick-actions .active').forEach(button=>button.classList.remove('active'));tab('rt');routeUI();toast(`Route ${slot==='from'?'start':'destination'} set at ${coordText(ll)}.`);
 }
 function distanceMeters(a,b){const dy=(a.lat-b.lat)*111320,dx=(a.lng-b.lng)*111320*Math.cos(a.lat*Math.PI/180);return Math.hypot(dx,dy)}
 function pinReport(ll){if(reportMarker)reportMarker.remove();reportMarker=L.circleMarker(ll,{radius:10,color:'#fff',weight:3,fillColor:'#d6246e',fillOpacity:1}).addTo(reportLayer)}
@@ -149,7 +190,7 @@ function requestMyLocation(){
  if(!navigator.geolocation){$('#locstatus').textContent='Location is unavailable in this browser · showing the demo area';return}
  $('#locstatus').textContent='Requesting your location…';
  navigator.geolocation.getCurrentPosition(position=>{
-  origin={lat:position.coords.latitude,lng:position.coords.longitude};located=true;
+  origin={lat:position.coords.latitude,lng:position.coords.longitude};located=true;restoreCompletedIssues();
   geoMap.fitBounds(L.latLngBounds(toLatLng(0,0),toLatLng(800,520)),{padding:[20,20],maxZoom:15});
   if(userMarker)userMarker.setLatLng([origin.lat,origin.lng]);
   else userMarker=L.marker([origin.lat,origin.lng],{interactive:false,icon:L.divIcon({className:'user-location-icon',html:'<span class="user-location"></span>',iconSize:[24,24],iconAnchor:[12,12]})}).addTo(geoMap);
@@ -161,11 +202,11 @@ function requestMyLocation(){
   toast(error.code===1?'Allow location access in your browser to center the satellite map on you.':'Could not read your location. The demo map is still available.');
  },{enableHighAccuracy:true,timeout:12000,maximumAge:60000});
 }
-geoMap.on('click',e=>{const p=toLocal(e.latlng);rep.x=p.x;rep.y=p.y;showCoordinates(e.latlng,'Selected report location');pinReport(e.latlng);tab('rep');repUI()});
+geoMap.on('click',e=>{if(mapPickTarget){setMapRoutePoint(mapPickTarget,e.latlng);return}const p=toLocal(e.latlng);rep.x=p.x;rep.y=p.y;showCoordinates(e.latlng,'Selected report location');pinReport(e.latlng);tab('rep');repUI()});
 $('#locate').onclick=requestMyLocation;
 drawSchoolLayer();geoMap.fitBounds(L.latLngBounds(toLatLng(0,0),toLatLng(800,520)),{padding:[20,20],maxZoom:15});
 function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(t.h);t.h=setTimeout(()=>t.classList.remove('on'),4500)}
-function tab(k){['top','rep','det','rt','plan'].forEach(x=>$('#p-'+x).hidden=x!=k);if(k=='rt')routeUI();else routeLayer.clearLayers();document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t==k))}
+function tab(k){['top','rep','det','rt','plan','hist'].forEach(x=>$('#p-'+x).hidden=x!=k);if(k=='rt')routeUI();else routeLayer.clearLayers();if(k==='hist')renderHistory();document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t==k))}
 document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>tab(b.dataset.t));
 function sel(id){cur=id;const i=issues.find(x=>x.id==id);if(i){const ll=toLatLng(i.x,i.y);showCoordinates(ll,'Issue #'+i.id);geoMap.panTo(ll)}render();tab('det')}
 function repUI(){
@@ -195,13 +236,25 @@ function render(){
   else{i.marker.setLatLng(toLatLng(i.x,i.y));i.marker.setIcon(icon)}
   i.marker.bindTooltip('Issue #'+i.id+' · '+T[i.t]+' · '+(i.fx?'Fixed':'Score '+score.total),{direction:'top',offset:[0,-25]});
  });
- const O=$('#top');issues.forEach(i=>{if(!i.li){i.li=document.createElement('li');i.li.onclick=()=>sel(i.id);O.append(i.li)}});
+ const O=$('#top');issues.forEach(i=>{if(!i.li){i.li=document.createElement('li');i.li.onclick=()=>sel(i.id);O.append(i.li)}i.li.hidden=Boolean(i.fx)});
  const f=new Map(issues.map(i=>[i,i.li.hidden?null:i.li.getBoundingClientRect().top]));
  rows.sort((a,b)=>b.s.total-a.s.total).forEach(({i,s},k)=>{i.li.hidden=k>9;i.li.classList.toggle('on',i.id==cur);
   i.li.innerHTML=`<span class="rk">${k+1}</span><div><strong>${T[i.t]}</strong> <em>#${i.id}</em><p>${why(i,s)}</p></div><span class="sc" style="background:${band(s.total)[1]}">${s.total}</span>`;O.append(i.li)});
  rows.slice(0,10).forEach(({i})=>{const o=f.get(i);if(o==null)return;const d=o-i.li.getBoundingClientRect().top;if(!d)return;
   i.li.style.transition='none';i.li.style.transform=`translateY(${d}px)`;requestAnimationFrame(()=>requestAnimationFrame(()=>{i.li.style.transition='transform .8s cubic-bezier(.2,.8,.2,1)';i.li.style.transform=''}))});
- detail();routeUI();planUI()}
+ detail();routeUI();planUI();renderHistory()}
+function renderHistory(){
+ const list=$('#history-list');if(!list)return;
+ const count=historyRecords.length;$('#history-count').textContent=count;$('#history-total').textContent=count;list.className='history-list';
+ if(!count){list.innerHTML='<div class="history-empty">No completed tasks yet. Open an issue and mark it as fixed to add it here.</div>';return}
+ const rows=[...historyRecords].sort((a,b)=>new Date(b.completedAt||0)-new Date(a.completedAt||0));
+ list.innerHTML=rows.map((record,index)=>{const date=new Date(record.completedAt||0),dateText=Number.isNaN(date.getTime())?'Completed previously':date.toLocaleString(undefined,{dateStyle:'medium',timeStyle:'short'});return`<button class="history-card" type="button" data-history-index="${index}"><span><strong>${esc(record.title||T[record.type]||'Completed task')} #${esc(record.issueId)}</strong><small>${esc(dateText)} · ${esc(coordText(L.latLng(record.lat,record.lon)))}</small>${record.afterPhoto?'<small>After photo attached</small>':''}</span><span class="history-status">Fixed</span></button>`}).join('');
+ list.querySelectorAll('[data-history-index]').forEach(button=>button.onclick=()=>{
+  const record=rows[Number(button.dataset.historyIndex)],issue=issues.find(i=>i.id===Number(record.issueId)&&i.t===record.type&&i.x===record.x&&i.y===record.y);
+  if(issue&&issue.fx){sel(issue.id);return}
+  const ll=L.latLng(record.lat,record.lon);geoMap.setView(ll,17);showCoordinates(ll,'Completed task location');toast('Showing the archived task location. Its issue is not part of this map session.');
+ });
+}
 function detail(){const D=$('#p-det'),i=issues.find(x=>x.id==cur);
  if(!i){D.innerHTML='<p class="mu">Tap any pin on the map to see its score and exactly how it was calculated.</p>';return}
  const s=sc(i),b=band(s.total),R=[[`Impact on ${P[ps].s}`,s.impact,45,`${T[i.t]} weighs ${s.weight.toFixed(2)} for this persona, times 45`],['Footfall exposure',s.footfall,25,`${s.distance} m from the ${s.place}`],['Corroboration',s.corroboration,15,`${i.n} report${i.n>1?'s':''}, full marks at 5`],['Time unresolved',s.age,15,`${i.age} day${i.age==1?'':'s'}, full marks at 30`]];
@@ -218,7 +271,7 @@ document.querySelectorAll('#pers button').forEach(b=>b.onclick=()=>{ps=b.dataset
 const C=REPAIR_COSTS,fmt=n=>'₹'+n.toLocaleString('en-IN'),live=()=>issues.filter(i=>!i.fx);
 const wt=i=>P[ps].w[K.indexOf(i.t)];
 let currentRouteKey='';
-const routeStop=id=>id==='current'?{id:'current',name:located?'My location':'Bengaluru demo center',lat:origin.lat,lon:origin.lng}:schools.find(s=>s.id===id);
+const routeStop=id=>id==='current'?{id:'current',name:located?'My location':'Bengaluru demo center',lat:origin.lat,lon:origin.lng}:routePins.from?.id===id?routePins.from:routePins.to?.id===id?routePins.to:schools.find(s=>s.id===id);
 const profile=()=>ps==='wheel'?'wheelchair':ps==='vis'?'blind':'foot';
 const fmtDistance=km=>km<1?`${Math.round(km*1000)} m`:`${km.toFixed(1)} km`;
 const fmtDuration=seconds=>{const minutes=Math.max(1,Math.round(seconds/60));return minutes<60?`${minutes} min`:`${Math.floor(minutes/60)} hr ${minutes%60} min`};
@@ -247,11 +300,11 @@ function showRoute(route,from,to,fit){
 function routeUI(){
  routeLayer.clearLayers();if($('#p-rt').hidden)return;
  const p=P[ps],from=routeStop($('#ra').value),to=routeStop($('#rb').value),costing=profile();
- $('#rtn').textContent=`${located?(schoolSource==='Nominatim'?'OpenStreetMap search matches may be incomplete.':'Nearby schools are based on OpenStreetMap data.'):'Use your location to load nearby schools.'} Walking profile: ${costing==='blind'?'visually impaired':costing==='wheelchair'?'wheelchair':'standard pedestrian'}.`;
+ $('#rtn').textContent=`Set a start and destination anywhere on the map or search for an address. Nearby schools are also available. Walking profile: ${costing==='blind'?'visually impaired':costing==='wheelchair'?'wheelchair':'standard pedestrian'}.`;
  if(!from||!to||$('#ra').value===$('#rb').value){
-  const message=!located?'Use your location to find nearby schools.':schoolLookupPending?'Finding nearby schools…':schoolSearchPending?'Searching OpenStreetMap for nearby school matches…':schoolSearchError?'OpenStreetMap could not complete the school search.':!schoolLookupReady?'Nearby school data is temporarily unavailable.':!schools.length?'No nearby school matches were found.':'Choose two different locations.';
-  const searchAction=located&&!schools.length&&!schoolLookupPending&&!schoolSearchPending?`<button class="sm" id="search-schools" type="button">Search nearby schools in OpenStreetMap</button><small>Search matches are best results and may not include every school. OpenStreetMap data © contributors.</small>`:'';
-  const detail=schoolSearchError?`<span>${esc(schoolSearchError)}</span>`:schools.length?'<span>Pick a nearby school for turn-by-turn walking directions.</span>':!located?'<span>Government and primary labels appear when local map data identifies them.</span>':'';
+  const message=$('#ra').value===$('#rb').value?'Choose two different route points.':!from||!to?'Set a start and destination to get a walking route.':schoolLookupPending?'Finding nearby school options…':schoolSearchPending?'Searching for nearby school options…':schoolSearchError?'Nearby school lookup is temporarily unavailable.':'Choose any two places using the map or search above.';
+  const searchAction=located&&!schools.length&&!schoolLookupPending&&!schoolSearchPending?`<button class="sm" id="search-schools" type="button">Search nearby schools in OpenStreetMap</button><small>School search results may be incomplete. OpenStreetMap data © contributors.</small>`:'';
+  const detail=schoolSearchError?`<span>${esc(schoolSearchError)}</span>`:schools.length?'<span>You can also select a nearby school in either dropdown.</span>':'<span>Routes are not limited to schools. Use map pins or search for an address above.</span>';
   $('#rres').innerHTML=`<div class="route-empty"><strong>${message}</strong>${detail}${searchAction}</div>`;
   const searchButton=$('#search-schools');if(searchButton)searchButton.onclick=searchNearbySchoolMatches;
   return
@@ -273,7 +326,13 @@ function brief(){const r=live().map(i=>({i,s:sc(i)})).sort((a,b)=>b.s.total-a.s.
  $('#brief').innerHTML=`<h1>Last 100 m: ward brief</h1><p>Persona: ${P[ps].n}. ${live().length} open issues, ${issues.length-live().length} fixed.</p><h2>Top 5 fixes</h2><ol>${r.map(({i,s})=>`<li><strong>${T[i.t]} #${i.id}</strong>, score ${s.total} (${band(s.total)[0]}). ${why(i,s)}</li>`).join('')}</ol><h2>Budget plan, ${fmt(q.b)}</h2><p>${q.pick.map(x=>T[x.i.t]+' #'+x.i.id).join(', ')||'None'}</p>`;
  try{window.print()}catch(e){toast('Printing is blocked here. Open the page link in its own tab and try again.')}}
 const cmp=i=>{const st=`style='clip-path:inset(0 calc(100% - var(--p)*1%) 0 0)'`;return`<div class='cmp' style='--p:50'><img src='${i.af}' alt='After the fix'>${i.ph?`<img src='${i.ph}' alt='Before the fix' ${st}>`:`<div class='pv' ${st}>No before photo</div>`}</div><input type='range' min='0' max='100' value='50' aria-label='Before and after'>`};
-function fixIt(i){i.fx=true;i.li.hidden=true;toast(`#${i.id} marked fixed. Map pins, ranking, and routes updated.`);render()}
+function fixIt(i){
+ i.fx=true;i.li.hidden=true;i.completedAt=new Date().toISOString();
+ const ll=toLatLng(i.x,i.y),record={issueId:i.id,type:i.t,title:T[i.t],x:i.x,y:i.y,lat:ll.lat,lon:ll.lng,baseLat:origin.lat,baseLon:origin.lng,completedAt:i.completedAt,reports:i.n,afterPhoto:Boolean(i.af)};
+ historyRecords=[record,...historyRecords.filter(r=>!(Number(r.issueId)===i.id&&r.type===i.t&&r.x===i.x&&r.y===i.y))].slice(0,200);
+ try{localStorage.setItem(HISTORY_KEY,JSON.stringify(historyRecords))}catch{toast('Task marked fixed. Browser storage is unavailable, so history lasts only until this page closes.')}
+ if(!$('#p-hist').hidden)renderHistory();toast(`#${i.id} marked fixed and added to History.`);render()
+}
 function wire(i){const D=$('#p-det'),q=s=>D.querySelector(s);
  if(q('#st'))q('#st').onclick=()=>{i.n++;i.reports=i.n;i.cf=(i.cf||0)+1;toast(`Confirmed. #${i.id} now has ${i.n} reports, so its score went up.`);render()};
  if(q('#af'))q('#af').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>i.af=r.result;r.readAsDataURL(f)};
@@ -284,5 +343,9 @@ $('#vt').onkeydown=e=>{if(e.key=='Enter'&&e.target.value.trim())tag(e.target.val
 $('#mic').onclick=()=>{const R=window.SpeechRecognition||window.webkitSpeechRecognition;if(!R)return toast('Voice input is not supported in this browser. Type instead.');const r=new R();r.lang=$('#lg').value;r.onresult=e=>{const t=e.results[0][0].transcript;$('#vt').value=t;tag(t)};r.onerror=()=>toast('The microphone is not available here. Type instead.');r.start()};
 rebuildRouteOptions(false);
 ['ra','rb'].forEach(id=>$('#'+id).onchange=()=>{fitNextRoute=true;const stop=routeStop($('#'+id).value);if(stop)showCoordinates(L.latLng(stop.lat,stop.lon),id==='ra'?'Route start':'Route destination');routeUI()});
+$('#pick-route-start').onclick=()=>beginMapRoutePick('from');
+$('#pick-route-end').onclick=()=>beginMapRoutePick('to');
+$('#route-search').onclick=searchRoutePlace;
+$('#route-query').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();searchRoutePlace()}};
 $('#bud').oninput=planUI;
 repUI();render();showCoordinates(L.latLng(origin.lat,origin.lng),'Bengaluru demo center');requestMyLocation();
