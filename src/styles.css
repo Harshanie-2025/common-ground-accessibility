@@ -138,17 +138,3 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--ac);outline-off
 .notification-item small{color:var(--mu);font-size:11px}
 .notification-item.unread{background:color-mix(in srgb,var(--ac) 8%,var(--sf))}
 .notification-panel[hidden],.notification-count[hidden]{display:none}
-
-.resolution-chart {
-  position: relative;
-  width: 100%;
-  max-width: 220px;
-  height: 220px;
-  margin: 20px auto;
-}
-
-.resolution-chart canvas {
-  display: block;
-  width: 100% !important;
-  height: 100% !important;
-}

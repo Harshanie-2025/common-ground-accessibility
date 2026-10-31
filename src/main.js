@@ -1,7 +1,6 @@
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import './styles.css';
-import Chart from 'chart.js/auto';
 import { CATEGORY_KEYS, ISSUE_TITLES, PERSONAS, REPAIR_COSTS, createSeedIssues } from './data.js';
 import { calculateScore, explainScore, priorityBand } from './scoring.js';
 import { guessIssueCategory } from './reporting.js';
@@ -13,57 +12,6 @@ const P=Object.fromEntries(Object.entries(PERSONAS).map(([key,p])=>[key,{n:p.nam
 const HISTORY_KEY='last100m.completedTasks.v1';
 function readHistory(){try{const rows=JSON.parse(localStorage.getItem(HISTORY_KEY)||'[]');return Array.isArray(rows)?rows.filter(r=>r&&Number.isFinite(Number(r.issueId))&&Number.isFinite(Number(r.lat))&&Number.isFinite(Number(r.lon))).slice(0,200):[]}catch{return[]}}
 let historyRecords=readHistory();
-let resolutionChart = null;
-
-function updateResolutionChart() {
-  const canvas = document.getElementById('resolution-chart');
-
-  if (!canvas) return;
-
-  const solved = issues.filter(i => i.fx).length;
-  const pending = issues.length - solved;
-  const total = issues.length;
-
-  document.getElementById('solved-count').textContent = solved;
-  document.getElementById('pending-count').textContent = pending;
-
-  document.getElementById('resolution-rate').textContent =
-    total ? Math.round((solved / total) * 100) + '%' : '0%';
-
-  if (!resolutionChart) {
-    resolutionChart = new Chart(canvas, {
-      type: 'pie',
-
-      data: {
-        labels: ['Solved', 'Pending'],
-        datasets: [{
-          data: [solved, pending],
-          backgroundColor: ['#16a34a', '#f59e0b'],
-          borderColor: '#0b171c',
-          borderWidth: 3
-        }]
-      },
-
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-
-        plugins: {
-          legend: {
-            display: true,
-            position: 'bottom',
-            labels: {
-              color: '#dce8ef'
-            }
-          }
-        }
-      }
-    });
-  } else {
-    resolutionChart.data.datasets[0].data = [solved, pending];
-    resolutionChart.update();
-  }
-}
 const issues=createSeedIssues().map(i=>({id:i.id,t:i.type,type:i.type,x:i.x,y:i.y,n:i.reports,reports:i.reports,age:i.age,mg:i.merged}));
 function restoreCompletedIssues(){issues.forEach(i=>{delete i.fx;delete i.completedAt});for(const record of historyRecords){if(distanceMeters({lat:record.baseLat??DEMO_CENTER.lat,lng:record.baseLon??DEMO_CENTER.lng},origin)>1000)continue;const issue=issues.find(i=>i.id===Number(record.issueId)&&i.t===record.type&&i.x===record.x&&i.y===record.y);if(issue){issue.fx=true;issue.completedAt=record.completedAt}}}
 let ps='wheel',cur=0,merged=0,rep={};
@@ -300,12 +248,7 @@ function render(){
   i.li.innerHTML=`<span class="rk">${k+1}</span><div><strong>${T[i.t]}</strong> <em>#${i.id}</em><p>${why(i,s)}</p></div><span class="sc" style="background:${band(s.total)[1]}">${s.total}</span>`;O.append(i.li)});
  rows.slice(0,10).forEach(({i})=>{const o=f.get(i);if(o==null)return;const d=o-i.li.getBoundingClientRect().top;if(!d)return;
   i.li.style.transition='none';i.li.style.transform=`translateY(${d}px)`;requestAnimationFrame(()=>requestAnimationFrame(()=>{i.li.style.transition='transform .8s cubic-bezier(.2,.8,.2,1)';i.li.style.transform=''}))});
- detail();
- routeUI();
- planUI();
- renderHistory();
-updateResolutionChart();
-}
+ detail();routeUI();planUI();renderHistory()}
 function renderHistory(){
  const list=$('#history-list');if(!list)return;
  const count=historyRecords.length;$('#history-count').textContent=count;$('#history-total').textContent=count;list.className='history-list';
