@@ -56,7 +56,6 @@ main{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(330px,1fr);gap:1
 .osm-popup ul{display:grid;gap:3px;margin:3px 0;padding-left:17px;font-size:11px}
 .osm-popup small{font-size:10px;color:#5c737a}
 .osm-popup a{font-size:11px;color:#146582;text-underline-offset:2px}
-.school-icon span{width:32px;height:32px;border-radius:11px;background:#fff;color:#18333d;font-size:18px}
 .route-end-icon{background:none;border:0}
 .route-end-icon span{width:30px;height:30px;display:grid;place-items:center;border:3px solid #fff;border-radius:50%;background:#102a35;color:#fff;font-weight:800;box-shadow:0 2px 9px #0009}
 .route-summary{display:grid;gap:3px;padding:14px 15px;background:var(--ink);color:var(--bg);border-radius:17px}

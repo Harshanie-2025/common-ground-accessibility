@@ -29,7 +29,7 @@ PERSONAS.all = {
 
 export const PLACES = [
   { name: 'Govt. Hospital', x: 400, y: 262, weight: 1, icon: '+' },
-  { name: 'Primary School', x: 170, y: 112, weight: .85, icon: 'S' },
+  { name: 'Community Centre', x: 170, y: 112, weight: .8, icon: 'C' },
   { name: 'Bus Stop', x: 630, y: 262, weight: .7, icon: 'B' },
   { name: 'Vegetable Market', x: 520, y: 112, weight: .9, icon: 'M' },
   { name: 'Metro Station', x: 170, y: 410, weight: .8, icon: 'T' },

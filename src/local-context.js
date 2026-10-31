@@ -1,10 +1,9 @@
-const PLACE_RADIUS_METERS = 3000;
-const ACCESS_RADIUS_METERS = 1500;
-const MAX_PLACES = 45;
-const MAX_ACCESS_FEATURES = 45;
+const PLACE_RADIUS_METERS = 2000;
+const ACCESS_RADIUS_METERS = 1000;
+const MAX_PLACES = 30;
+const MAX_ACCESS_FEATURES = 30;
 
 const FACILITY_LABELS = {
-  school: 'School',
   hospital: 'Hospital',
   clinic: 'Clinic',
   doctors: 'Doctor',
@@ -85,7 +84,7 @@ export function buildLocalContextQuery(center) {
   const boundsFor = radius => `(${(lat - latDelta(radius)).toFixed(4)},${(lon - lonDelta(radius)).toFixed(4)},${(lat + latDelta(radius)).toFixed(4)},${(lon + lonDelta(radius)).toFixed(4)})`;
   const placeBounds = boundsFor(PLACE_RADIUS_METERS);
   const accessBounds = boundsFor(ACCESS_RADIUS_METERS);
-  const placeAmenities = 'school|hospital|clinic|doctors|pharmacy|bus_station|marketplace|community_centre|library|toilets|public_building';
+  const placeAmenities = 'hospital|clinic|doctors|pharmacy|bus_station|marketplace|community_centre|library|toilets|public_building';
   return `[out:json][timeout:10];(
  nwr${placeBounds}["amenity"~"^(${placeAmenities})$"];
  nwr${placeBounds}["highway"~"^(bus_stop)$"];
@@ -94,7 +93,7 @@ export function buildLocalContextQuery(center) {
  nwr${accessBounds}["barrier"="kerb"];
  node${accessBounds}["kerb"];
  nwr${accessBounds}["amenity"~"^(${placeAmenities})$"]["wheelchair"~"^(yes|no|limited)$"];
-);out center tags 500;`;
+);out center tags 250;`;
 }
 
 export function parseLocalContext(elements, center) {
