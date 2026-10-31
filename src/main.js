@@ -24,6 +24,7 @@ function updateResolutionChart() {
   const pending = issues.length - solved;
   const total = issues.length;
 
+  document.getElementById('total-count').textContent = total;
   document.getElementById('solved-count').textContent = solved;
   document.getElementById('pending-count').textContent = pending;
 
