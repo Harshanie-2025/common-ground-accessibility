@@ -30,7 +30,7 @@ L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/
  attribution:'Imagery © Esri, Maxar, Earthstar Geographics, and the GIS User Community'
 }).addTo(geoMap);
 L.control.scale({metric:true,imperial:false,position:'bottomleft'}).addTo(geoMap);
-const placeLayer=L.layerGroup().addTo(geoMap),issueLayer=L.layerGroup().addTo(geoMap),routeLayer=L.layerGroup().addTo(geoMap),reportLayer=L.layerGroup().addTo(geoMap);
+const placeLayer=L.layerGroup().addTo(geoMap),issueLayer=L.layerGroup().addTo(geoMap),routeLayer=L.layerGroup().addTo(geoMap),routeEndpointLayer=L.layerGroup().addTo(geoMap),reportLayer=L.layerGroup().addTo(geoMap);
 const toLatLng=(x,y)=>{
  const north=(260-y)*METERS_PER_UNIT,east=(x-400)*METERS_PER_UNIT;
  return L.latLng(origin.lat+north/111320,origin.lng+east/(111320*Math.cos(origin.lat*Math.PI/180)));
@@ -176,14 +176,14 @@ async function searchRoutePlace(){
 function assignRoutePlace(slot,place){
  if(!place)return;
  const id=`route-${slot}`;routePins[slot]={id,name:place.name,kind:'Place',lat:place.lat,lon:place.lon,source:place.address||'OpenStreetMap'};
- rebuildRouteOptions(true);$('#r'+slot).value=id;fitNextRoute=true;
- const ll=L.latLng(place.lat,place.lon);showCoordinates(ll,slot==='from'?'Route start':'Route destination');geoMap.panTo(ll);tab('rt');routeUI();
+ rebuildRouteOptions(true);$('#r'+(slot==='from'?'a':'b')).value=id;fitNextRoute=true;
+ const ll=L.latLng(place.lat,place.lon);showCoordinates(ll,slot==='from'?'Route start':'Route destination');geoMap.panTo(ll);tab('rt');
 }
 function beginMapRoutePick(slot){tab('rt');mapPickTarget=slot;document.querySelectorAll('.route-pick-actions .active').forEach(button=>button.classList.remove('active'));$('#map').classList.add('route-picking');$('#pick-route-'+(slot==='from'?'start':'end')).classList.add('active');toast(`Tap the map to set the route ${slot==='from'?'start':'destination'}.`)}
 function setMapRoutePoint(slot,ll){
  const id=`route-${slot}`;routePins[slot]={id,name:`Map point · ${coordText(ll)}`,kind:'Map point',lat:ll.lat,lon:ll.lng,source:'Map pin'};
- rebuildRouteOptions(true);$('#r'+slot).value=id;fitNextRoute=true;showCoordinates(ll,slot==='from'?'Route start':'Route destination');
- mapPickTarget=null;$('#map').classList.remove('route-picking');document.querySelectorAll('.route-pick-actions .active').forEach(button=>button.classList.remove('active'));tab('rt');routeUI();toast(`Route ${slot==='from'?'start':'destination'} set at ${coordText(ll)}.`);
+ rebuildRouteOptions(true);$('#r'+(slot==='from'?'a':'b')).value=id;fitNextRoute=true;showCoordinates(ll,slot==='from'?'Route start':'Route destination');
+ mapPickTarget=null;$('#map').classList.remove('route-picking');document.querySelectorAll('.route-pick-actions .active').forEach(button=>button.classList.remove('active'));tab('rt');toast(`Route ${slot==='from'?'start':'destination'} set at ${coordText(ll)}.`);
 }
 function distanceMeters(a,b){const dy=(a.lat-b.lat)*111320,dx=(a.lng-b.lng)*111320*Math.cos(a.lat*Math.PI/180);return Math.hypot(dx,dy)}
 function pinReport(ll){if(reportMarker)reportMarker.remove();reportMarker=L.circleMarker(ll,{radius:10,color:'#fff',weight:3,fillColor:'#d6246e',fillOpacity:1}).addTo(reportLayer)}
@@ -211,7 +211,7 @@ $('#locate').onclick=requestMyLocation;
 $('#pick-report-location').onclick=beginReportMapPick;
 drawSchoolLayer();geoMap.fitBounds(L.latLngBounds(toLatLng(0,0),toLatLng(800,520)),{padding:[20,20],maxZoom:15});
 function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(t.h);t.h=setTimeout(()=>t.classList.remove('on'),4500)}
-function tab(k){if(reportPickActive&&k!=='rep'){reportPickActive=false;map.classList.remove('report-picking');$('#pick-report-location').classList.remove('active');$('#pick-report-location').setAttribute('aria-pressed','false')}['top','rep','det','rt','plan','hist'].forEach(x=>$('#p-'+x).hidden=x!=k);if(k=='rt')routeUI();else routeLayer.clearLayers();if(k==='hist')renderHistory();document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t==k))}
+function tab(k){if(reportPickActive&&k!=='rep'){reportPickActive=false;map.classList.remove('report-picking');$('#pick-report-location').classList.remove('active');$('#pick-report-location').setAttribute('aria-pressed','false')}['top','rep','det','rt','plan','hist'].forEach(x=>$('#p-'+x).hidden=x!=k);if(k=='rt')routeUI();else{routeLayer.clearLayers();routeEndpointLayer.clearLayers()}if(k==='hist')renderHistory();document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t==k))}
 document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>tab(b.dataset.t));
 function sel(id){cur=id;const i=issues.find(x=>x.id==id);if(i){const ll=toLatLng(i.x,i.y);showCoordinates(ll,'Issue #'+i.id);geoMap.panTo(ll)}render();tab('det')}
 function repUI(){
@@ -290,12 +290,17 @@ async function fetchPedestrianRoute(from,to,costing){
 }
 function pointToSegmentMeters(point,a,b){const scaleX=111320*Math.cos(point.lat*Math.PI/180),ax=(a[1]-point.lng)*scaleX,ay=(a[0]-point.lat)*111320,bx=(b[1]-point.lng)*scaleX,by=(b[0]-point.lat)*111320,dx=bx-ax,dy=by-ay,ratio=Math.max(0,Math.min(1,-(ax*dx+ay*dy)/(dx*dx+dy*dy||1)));return Math.hypot(ax+ratio*dx,ay+ratio*dy)}
 function barriersOnRoute(points){return live().map(i=>{const ll=toLatLng(i.x,i.y);let d=Infinity;for(let n=1;n<points.length;n++)d=Math.min(d,pointToSegmentMeters(ll,points[n-1],points[n]));return{i,d,weight:wt(i)}}).filter(x=>x.d<28&&x.weight>=.3).sort((a,b)=>a.d-b.d)}
+function renderRouteEndpoints(from,to){
+ routeEndpointLayer.clearLayers();
+ if(!from||!to)return;
+ const endpoint=(stop,letter)=>L.marker(L.latLng(stop.lat,stop.lon),{pane:'markerPane',icon:L.divIcon({className:'route-end-icon',html:`<span>${letter}</span>`,iconSize:[30,30],iconAnchor:[15,15]})}).addTo(routeEndpointLayer).bindTooltip(`${stop.name} · ${coordText(L.latLng(stop.lat,stop.lon))}`,{direction:'top'});
+ endpoint(from,'A');endpoint(to,'B');
+}
 function showRoute(route,from,to,fit){
  routeLayer.clearLayers();const latlngs=route.points.map(p=>L.latLng(p[0],p[1]));
  L.polyline(latlngs,{pane:'routePane',color:'#fff',weight:13,opacity:.92,lineCap:'round',lineJoin:'round',attribution:'Route data © OpenStreetMap contributors'}).addTo(routeLayer);
  L.polyline(latlngs,{pane:'routePane',color:cssColor('--ac'),weight:7,opacity:.97,lineCap:'round',lineJoin:'round'}).addTo(routeLayer);
- const endpoint=(ll,label,letter)=>L.marker(ll,{pane:'markerPane',icon:L.divIcon({className:'route-end-icon',html:`<span>${letter}</span>`,iconSize:[30,30],iconAnchor:[15,15]})}).addTo(routeLayer).bindTooltip(`${label} · ${coordText(ll)}`,{direction:'top'});
- endpoint(L.latLng(from.lat,from.lon),from.name,'A');endpoint(L.latLng(to.lat,to.lon),to.name,'B');
+ renderRouteEndpoints(from,to);
  if(fit&&latlngs.length>1)geoMap.fitBounds(L.latLngBounds(latlngs),{padding:[55,55],maxZoom:17});
  const hazards=barriersOnRoute(route.points),summary=route.summary||{},steps=route.maneuvers||[];
  const eta=Number(summary.time)||steps.reduce((n,s)=>n+(Number(s.time)||0),0),distance=Number(summary.length)||steps.reduce((n,s)=>n+(Number(s.length)||0),0);
@@ -304,10 +309,11 @@ function showRoute(route,from,to,fit){
  $('#rres').innerHTML=`<div class="route-summary"><strong>${fmtDistance(distance)} · ${fmtDuration(eta)}</strong><span>Pedestrian route for ${esc(P[ps].n.toLowerCase())}</span></div>${hazardLine}${directionList}<small class="route-source">Street routing: OpenStreetMap data · Valhalla. Distance and time are estimates.</small>`;
 }
 function routeUI(){
- routeLayer.clearLayers();if($('#p-rt').hidden)return;
+ routeLayer.clearLayers();if($('#p-rt').hidden){routeEndpointLayer.clearLayers();return}
  const p=P[ps],from=routeStop($('#ra').value),to=routeStop($('#rb').value),costing=profile();
  $('#rtn').textContent=`Set a start and destination anywhere on the map or search for an address. Nearby schools are also available. Walking profile: ${costing==='blind'?'visually impaired':costing==='wheelchair'?'wheelchair':'standard pedestrian'}.`;
  if(!from||!to||$('#ra').value===$('#rb').value){
+  routeEndpointLayer.clearLayers();
   const message=$('#ra').value===$('#rb').value?'Choose two different route points.':!from||!to?'Set a start and destination to get a walking route.':schoolLookupPending?'Finding nearby school options…':schoolSearchPending?'Searching for nearby school options…':schoolSearchError?'Nearby school lookup is temporarily unavailable.':'Choose any two places using the map or search above.';
   const searchAction=located&&!schools.length&&!schoolLookupPending&&!schoolSearchPending?`<button class="sm" id="search-schools" type="button">Search nearby schools in OpenStreetMap</button><small>School search results may be incomplete. OpenStreetMap data © contributors.</small>`:'';
   const detail=schoolSearchError?`<span>${esc(schoolSearchError)}</span>`:schools.length?'<span>You can also select a nearby school in either dropdown.</span>':'<span>Routes are not limited to schools. Use map pins or search for an address above.</span>';
@@ -315,6 +321,7 @@ function routeUI(){
   const searchButton=$('#search-schools');if(searchButton)searchButton.onclick=searchNearbySchoolMatches;
   return
  }
+ renderRouteEndpoints(from,to);
  const key=[from.lat.toFixed(6),from.lon.toFixed(6),to.lat.toFixed(6),to.lon.toFixed(6),costing].join('|'),fit=fitNextRoute;fitNextRoute=false;currentRouteKey=key;
  if(routeCache.has(key)){showRoute(routeCache.get(key),from,to,fit);return}
  $('#rres').innerHTML='<div class="route-loading"><span class="spinner"></span><strong>Finding a walkable street route…</strong><small>Using OpenStreetMap street data.</small></div>';
