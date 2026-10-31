@@ -6,6 +6,7 @@ import { CATEGORY_KEYS, ISSUE_TITLES, PERSONAS, REPAIR_COSTS, createSeedIssues }
 import { calculateScore, explainScore, priorityBand } from './scoring.js';
 import { guessIssueCategory } from './reporting.js';
 import { getNotifications, addNotification, markAsRead, clearNotifications } from './notification.js';
+import { fetchLocalContext } from './local-context.js';
 
 const $=s=>document.querySelector(s);
 const K=CATEGORY_KEYS,T=ISSUE_TITLES;
@@ -74,6 +75,7 @@ const sc=(issue,persona=ps)=>calculateScore(issue,persona,schools.length?scorePl
 const why=(issue,breakdown)=>explainScore(issue,breakdown,ps);
 const map=$('#map'),DEMO_CENTER={lat:12.9716,lng:77.5946},METERS_PER_UNIT=2.5;
 let origin={...DEMO_CENTER},located=false,userMarker=null,reportMarker=null,reportPickActive=false,schools=[],schoolRequest=0,fitNextRoute=false,schoolLookupKey='',schoolLookupAt=0,schoolLookupReady=false,schoolLookupPending=false,schoolSearchPending=false,schoolSearchError='',schoolSource='',routePins={from:null,to:null},mapPickTarget=null,placeResults=[],placeSearchPending=false,placeSearchError='',nominatimBusy=false,lastNominatimSearchAt=0;
+let localContext=[],localContextRequest=0,localContextCenterKey='',localContextPending=false,localContextError='',localContextLoaded=false,localContextVisible=true,localContextTimestamp='';
 restoreCompletedIssues();
 const routeCache=new Map(),routePending=new Map();
 const geoMap=L.map(map,{zoomControl:true,scrollWheelZoom:false,preferCanvas:true}).setView([origin.lat,origin.lng],15);
@@ -83,7 +85,7 @@ L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/
  attribution:'Imagery © Esri, Maxar, Earthstar Geographics, and the GIS User Community'
 }).addTo(geoMap);
 L.control.scale({metric:true,imperial:false,position:'bottomleft'}).addTo(geoMap);
-const placeLayer=L.layerGroup().addTo(geoMap),issueLayer=L.layerGroup().addTo(geoMap),routeLayer=L.layerGroup().addTo(geoMap),routeEndpointLayer=L.layerGroup().addTo(geoMap),reportLayer=L.layerGroup().addTo(geoMap);
+const placeLayer=L.layerGroup().addTo(geoMap),localContextLayer=L.layerGroup().addTo(geoMap),issueLayer=L.layerGroup().addTo(geoMap),routeLayer=L.layerGroup().addTo(geoMap),routeEndpointLayer=L.layerGroup().addTo(geoMap),reportLayer=L.layerGroup().addTo(geoMap);
 const toLatLng=(x,y)=>{
  const north=(260-y)*METERS_PER_UNIT,east=(x-400)*METERS_PER_UNIT;
  return L.latLng(origin.lat+north/111320,origin.lng+east/(111320*Math.cos(origin.lat*Math.PI/180)));
@@ -97,6 +99,75 @@ const coordText=ll=>'Lat '+ll.lat.toFixed(6)+' · Lng '+ll.lng.toFixed(6);
 const cssColor=name=>getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 const bandColor=token=>cssColor(token.match(/--[\w-]+/)[0]);
 function showCoordinates(ll,label='Selected location'){$('#mapcoord-label').textContent=label;$('#mapcoord').textContent=coordText(ll)}
+function updateLocalContextUI(){
+ const button=$('#local-context-toggle'),status=$('#local-data-status');
+ if(!button||!status)return;
+ button.disabled=!located||localContextPending;
+ if(!located){button.textContent='Use location to load data';status.textContent='Nearby OpenStreetMap context loads after you allow location access.';return}
+ if(localContextPending){button.textContent='Loading nearby data…';status.textContent='Looking up mapped places and accessibility details around your location.';return}
+ if(localContextError){button.disabled=false;button.textContent='Retry nearby data';status.textContent=`OpenStreetMap lookup failed: ${localContextError}`;return}
+ if(!localContextLoaded){button.textContent='Load nearby OSM data';status.textContent='Load mapped public places and accessibility details within 1.5 km of your location.';return}
+ const placeCount=localContext.filter(feature=>feature.kind!=='access').length;
+ const accessCount=localContext.filter(feature=>feature.kind==='access').length;
+ const timestamp=localContextTimestamp?new Date(localContextTimestamp).toLocaleString() : '';
+ button.disabled=false;
+ button.textContent=localContextVisible?'Hide nearby OSM data':'Show nearby OSM data';
+ status.textContent=localContext.length
+  ? `Showing ${placeCount} mapped places and ${accessCount} mapped accessibility-related features within 1.5 km${timestamp?` · OSM data snapshot ${timestamp}`:''}. Coverage is incomplete; check conditions on site.`
+  : 'No matching features were mapped within 1.5 km. Missing map data does not mean the area is accessible.';
+}
+function localFeatureIcon(feature){
+ if(feature.kind==='access')return '⚠';
+ if(feature.label==='Hospital'||feature.label==='Clinic'||feature.label==='Doctor')return '+';
+ if(feature.kind==='transit')return 'B';
+ if(feature.label==='Pharmacy')return 'Rx';
+ return '•';
+}
+function drawLocalContext(){
+ localContextLayer.clearLayers();
+ if(!localContextVisible)return;
+ localContext.forEach(feature=>{
+  const sourceUrl=`https://www.openstreetmap.org/${encodeURIComponent(feature.osmType)}/${encodeURIComponent(feature.osmId)}`;
+  const notes=feature.notes.map(note=>`<li>${esc(note)}</li>`).join('');
+  const popup=`<div class="osm-popup"><strong>${esc(feature.name)}</strong><span>${esc(feature.label)}</span><ul>${notes}</ul><small>Mapped context only; this is not a user-verified issue.</small><a href="${sourceUrl}" target="_blank" rel="noopener noreferrer">View OpenStreetMap feature</a></div>`;
+  const marker=L.marker([feature.lat,feature.lon],{
+   icon:L.divIcon({className:`osm-marker osm-${feature.kind}`,html:`<span aria-hidden="true">${localFeatureIcon(feature)}</span>`,iconSize:[30,30],iconAnchor:[15,15]}),
+   title:`${feature.label}: ${feature.name}`,
+   alt:`${feature.label}: ${feature.name}`,
+  }).addTo(localContextLayer).bindPopup(popup,{maxWidth:280});
+  marker.bindTooltip(`${feature.label}: ${feature.name}`,{direction:'top',offset:[0,-10]});
+  marker.on('click',event=>{
+   if(event.originalEvent)L.DomEvent.stopPropagation(event.originalEvent);
+   if(reportPickActive){marker.closePopup();setReportLocation(event.latlng);return}
+   if(mapPickTarget){marker.closePopup();setMapRoutePoint(mapPickTarget,event.latlng)}
+  });
+ });
+}
+async function loadNearbyLocalContext(center,{force=false}={}){
+ if(!located)return;
+ const key=`${center.lat.toFixed(3)},${center.lng.toFixed(3)}`;
+ if(!force&&key===localContextCenterKey&&(localContextLoaded||localContextPending))return;
+ const request=++localContextRequest;
+ localContextCenterKey=key;localContextPending=true;localContextError='';localContextLoaded=false;localContext=[];localContextVisible=true;localContextTimestamp='';
+ localContextLayer.addTo(geoMap);drawLocalContext();updateLocalContextUI();
+ try{
+  const result=await fetchLocalContext(center);
+  if(request!==localContextRequest)return;
+  localContext=result.features;localContextTimestamp=result.timestamp;localContextPending=false;localContextLoaded=true;localContextError='';
+  drawLocalContext();updateLocalContextUI();
+ }catch(error){
+  if(request!==localContextRequest)return;
+  localContextPending=false;localContextLoaded=false;localContextError=error.message||'Nearby map data is temporarily unavailable.';
+  drawLocalContext();updateLocalContextUI();
+ }
+}
+function toggleLocalContext(){
+ if(!located){toast('Allow location access first to load real local map data.');return}
+ if(!localContextLoaded){loadNearbyLocalContext(origin,{force:Boolean(localContextError)});return}
+ localContextVisible=!localContextVisible;
+ if(localContextVisible)localContextLayer.addTo(geoMap);else localContextLayer.remove();
+ updateLocalContextUI();
+}
 function drawSchoolLayer(){
  placeLayer.clearLayers();
  schools.forEach(s=>{
@@ -134,7 +205,7 @@ async function loadNearbySchools(center){
  schoolLookupKey=centerKey;schoolLookupAt=Date.now();schoolLookupReady=false;schoolLookupPending=true;schools=[];
  rebuildRouteOptions(false);drawSchoolLayer();render();
  $('#locstatus').textContent='Satellite view near you · finding nearby schools…';
- const lat=center.lat.toFixed(6),lon=center.lng.toFixed(6);
+ const lat=center.lat.toFixed(3),lon=center.lng.toFixed(3);
  const query=`[out:json][timeout:10];(node(around:5000,${lat},${lon})["amenity"="school"]["name"];way(around:5000,${lat},${lon})["amenity"="school"]["name"];relation(around:5000,${lat},${lon})["amenity"="school"]["name"];);out center tags;`;
  try{
   let data=null,lastError=null;
@@ -247,11 +318,11 @@ function requestMyLocation(){
  if(!navigator.geolocation){$('#locstatus').textContent='Location is unavailable in this browser · showing the demo area';return}
  $('#locstatus').textContent='Requesting your location…';
  navigator.geolocation.getCurrentPosition(position=>{
-  origin={lat:position.coords.latitude,lng:position.coords.longitude};located=true;restoreCompletedIssues();
+  origin={lat:position.coords.latitude,lng:position.coords.longitude};located=true;restoreCompletedIssues();updateLocalContextUI();
   geoMap.fitBounds(L.latLngBounds(toLatLng(0,0),toLatLng(800,520)),{padding:[20,20],maxZoom:15});
   if(userMarker)userMarker.setLatLng([origin.lat,origin.lng]);
   else userMarker=L.marker([origin.lat,origin.lng],{interactive:false,icon:L.divIcon({className:'user-location-icon',html:'<span class="user-location"></span>',iconSize:[24,24],iconAnchor:[12,12]})}).addTo(geoMap);
-  loadNearbySchools(origin);if(rep.x!=null){const reportLL=toLatLng(rep.x,rep.y);pinReport(reportLL);$('#report-coords').textContent=coordText(reportLL)}
+  loadNearbySchools(origin).finally(()=>loadNearbyLocalContext(origin));if(rep.x!=null){const reportLL=toLatLng(rep.x,rep.y);pinReport(reportLL);$('#report-coords').textContent=coordText(reportLL)}
   $('#locstatus').textContent='Satellite view near you · finding nearby schools…';showCoordinates(L.latLng(origin.lat,origin.lng),'You are here');render();
  },error=>{
   $('#locstatus').textContent=error.code===1?'Location denied · Bengaluru demo area · sample issues':'Location unavailable · Bengaluru demo area · sample issues';
@@ -261,6 +332,8 @@ function requestMyLocation(){
 }
 geoMap.on('click',e=>{if(mapPickTarget){setMapRoutePoint(mapPickTarget,e.latlng);return}setReportLocation(e.latlng)});
 $('#locate').onclick=requestMyLocation;
+$('#local-context-toggle').onclick=toggleLocalContext;
+updateLocalContextUI();
 $('#pick-report-location').onclick=beginReportMapPick;
 drawSchoolLayer();geoMap.fitBounds(L.latLngBounds(toLatLng(0,0),toLatLng(800,520)),{padding:[20,20],maxZoom:15});
 function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(t.h);t.h=setTimeout(()=>t.classList.remove('on'),4500)}

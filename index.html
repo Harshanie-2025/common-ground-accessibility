@@ -65,10 +65,20 @@
    <div><b id="s3">0</b><span>duplicates merged</span></div>
    <div class="vw" id="vw"></div>
   </div>
-  <div class="mapbar"><span id="locstatus" aria-live="polite">Loading satellite imagery…</span><button class="sm" id="locate" type="button">◎ Use my location</button></div>
+  <div class="mapbar">
+   <span id="locstatus" aria-live="polite">Loading satellite imagery…</span>
+   <div class="map-actions">
+    <button class="sm" id="locate" type="button">◎ Use my location</button>
+    <button class="sm" id="local-context-toggle" type="button" disabled>Use location to load data</button>
+   </div>
+  </div>
+  <div class="local-data-note">
+   <span id="local-data-status" aria-live="polite">Nearby OpenStreetMap context loads after you allow location access.</span>
+   <small>Nearby OpenStreetMap searches use a center rounded to about 100 m. Map coverage can be incomplete; verify access on site. <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">© OpenStreetMap contributors</a></small>
+  </div>
   <div id="map" role="application" aria-label="Satellite map. Select a point to report an accessibility issue."></div>
   <div class="coordbar" aria-live="polite"><span id="mapcoord-label">Selected location</span><code id="mapcoord">Select a point on the map</code></div>
-  <div class="lg"><span style="--k:var(--c1)">Critical 75+</span><span style="--k:var(--c2)">High 55+</span><span style="--k:var(--c3)">Medium 35+</span><span style="--k:var(--c4)">Low</span><span style="--k:var(--ink)">Sample issues</span><span style="--k:var(--ac)">Tap the map to report</span></div>
+  <div class="lg"><span style="--k:var(--c1)">Critical 75+</span><span style="--k:var(--c2)">High 55+</span><span style="--k:var(--c3)">Medium 35+</span><span style="--k:var(--c4)">Low</span><span style="--k:var(--ink)">Sample issues</span><span style="--k:#167b78">OpenStreetMap places</span><span style="--k:#8153a5">OSM access features</span><span style="--k:var(--ac)">Tap the map to report</span></div>
  </section>
  <aside>
   <div class="tabs"><button data-t="top" class="on">Top 10 fixes</button><button data-t="rep">Report</button><button data-t="det">Issue</button><button data-t="rt">Route</button><button data-t="plan">Plan</button><button data-t="hist">History <span class="tab-count" id="history-count">0</span></button></div>

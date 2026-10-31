@@ -29,7 +29,7 @@ The API key stays in the local server environment and `.env` is ignored by Git. 
 
 ## Features
 
-- Esri satellite map centered on your browser location, with a Bengaluru demo fallback, selectable issue pins, and visible latitude/longitude. Nearby schools are first looked up from OpenStreetMap after location access is granted.
+- Esri satellite map centered on your browser location, with a Bengaluru demo fallback, selectable issue pins, and visible latitude/longitude. Nearby schools and a separate OpenStreetMap context layer are loaded after location access is granted. The context layer shows mapped public destinations, transit, crossings, steps, kerbs, and wheelchair-access tags; its search center is rounded to about 100 m.
 - Four accessibility personas plus an everyone view; scores and rankings respond to the selected person.
 - Plain-language Top 10 queue and a breakdown of impact, nearby footfall, confirmations, and time unresolved.
 - Report categories, map pin, photo attachment, multilingual text classification, and optional browser speech recognition in English, Hindi, and Kannada.
@@ -63,4 +63,4 @@ Last-100-Metres/
 
 The AI proxy uses Vite middleware in local development and Vite preview. A deployment to a static-only host needs an equivalent server-side function for `/api/ai` and a secret environment variable configured in the hosting platform.
 
-The score and sample issue pins are explainable demo data; searched destinations, school matches, and route geometry use public map services when available. New reports and photo previews stay in browser memory and reset when the page is refreshed; completed task history persists locally in the browser. Place search and routing need internet access and depend on public OpenStreetMap services and their usage limits. Nominatim returns best matches and may omit places. Street routing is an estimate and does not include live traffic. Speech recognition depends on browser support and microphone permission.
+The score and sample issue pins are explainable demo data; searched destinations, school matches, nearby OpenStreetMap context, and route geometry use public map services when available. OpenStreetMap context is separate from user reports and does not change issue scores. Mapped access tags can be incomplete or stale; their absence does not establish that a route or place is accessible, and mapped features need on-site verification. New reports and photo previews stay in browser memory and reset when the page is refreshed; completed task history persists locally in the browser. Place search and routing need internet access and depend on public OpenStreetMap services and their usage limits. Nominatim returns best matches and may omit places. Street routing is an estimate and does not include live traffic. Speech recognition depends on browser support and microphone permission.

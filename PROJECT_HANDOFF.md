@@ -1,6 +1,6 @@
 # Last 100 m — Project Handoff
 
-**Updated:** 30 October 2026  
+**Updated:** 31 October 2026
 **Local project:** `/Users/nookaharshavardhan/Documents/Codex/Last-100-Metres`  
 **GitHub repository:** <https://github.com/Harshanie-2025/common-ground-accessibility>  
 **Branch:** `main`
@@ -13,6 +13,7 @@ An accessibility-first civic dashboard for reporting street barriers and choosin
 
 - Responsive satellite-map dashboard with browser geolocation, latitude/longitude readout, issue pins, report form, photo preview, duplicate merging, issue scoring, persona switching, Top 10 ranking, and a budget planner.
 - Nearby schools are discovered from OpenStreetMap when location is available. If the automatic nearby-data lookup fails, the Route panel offers a user-triggered Nominatim school search. The school search is bounded and may return incomplete matches.
+- Added a separately toggled real-world OpenStreetMap context layer, loaded after browser location is granted. It shows nearby public destinations, transit, crossings, steps, kerbs, and wheelchair-access tags within 1.5 km. Its search center is rounded to about 100 m. These are map features, not verified citizen reports, and they do not enter the demo issue rankings.
 - Routing is no longer school-only. Users can:
   - choose **Set start on map** or **Set destination on map**, then tap a point on the map;
   - search any address or place and use a result as the route start or destination;
@@ -40,7 +41,8 @@ Open the local URL printed by Vite. Location access requires `localhost` or HTTP
 ## Key files
 
 - `index.html` — page structure and sidebar tabs, including Route and History.
-- `src/main.js` — Leaflet map, browser state, location and school discovery, any-place routing, issue reporting, scoring display, and completed-task history.
+- `src/main.js` — Leaflet map, browser state, location and school discovery, OSM context layer display, any-place routing, issue reporting, scoring display, and completed-task history.
+- `src/local-context.js` — bounded Overpass lookup and classification of nearby OSM places/accessibility tags.
 - `src/styles.css` — visual styling and responsive layouts.
 - `src/data.js` — personas, seed issues, issue labels, and repair costs.
 - `src/scoring.js` — persona-aware priority calculations and explanations.
@@ -54,6 +56,7 @@ Open the local URL printed by Vite. Location access requires `localhost` or HTTP
 - Free-text place search is only sent after the user presses Search (or Enter); it requests up to five Nominatim matches and uses the current map bounds as a preference, not a geographic restriction. Nominatim returns best matches and may be incomplete. Nearby-school fallback is also user-triggered. The one-second request spacing is per browser tab; a multi-user launch needs shared caching/throttling or a suitable provider.
 - Route paths depend on the public Valhalla demo server and mapped street data. A route may fail if a requested point cannot connect to its pedestrian graph or the service is unavailable. There is no live traffic or guaranteed wheelchair accessibility.
 - Esri supplies satellite imagery. OpenStreetMap supplies school/place search matches and routing data. These external services need internet access and may impose limits or change availability.
+- The OSM context layer is displayed as mapped information only; OSM coverage can be incomplete or stale. Steps, kerbs, crossings, and wheelchair tags need field verification and must not be presented as a complete accessibility audit.
 - Completed history is local to one browser profile. It is not synced to GitHub, another device, or another user. The project has no server/database/authentication.
 - The AI endpoint is a lightweight local prototype proxy in `vite.config.js`, with request-size and per-IP rate limits. The Vite dev and preview scripts bind to `127.0.0.1` so the AI key proxy is not exposed to other devices on the network. It does not provide production user authentication or distributed abuse controls. A static GitHub Pages deployment cannot execute it. A public deployment needs an equivalent serverless/server endpoint and its key stored in the host's secret settings.
 - OpenRouter API usage may incur charges depending on the selected model. Do not commit `.env` or expose the API key to frontend code.
