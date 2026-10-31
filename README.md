@@ -15,6 +15,10 @@ npm run dev
 
 Open the local address printed by Vite. Location access works on `localhost` or HTTPS. Esri receives satellite tile requests for the area visible in the map. To build the frontend, run `npm run build`; `npm run preview` also serves the local AI endpoint through the Vite server plugin.
 
+## Continuous integration
+
+GitHub Actions runs the production build on pushes to `main`, pull requests targeting `main`, and manual runs. The workflow uses Node.js 22, installs the exact dependency versions from `package-lock.json` with `npm ci`, and runs `npm run build`. It does not deploy the app. This project does not currently define lint or automated-test scripts, so the workflow checks dependency installation and the production build only.
+
 ### Enable the AI Access Copilot
 
 1. Copy `.env.example` to `.env` in the project root.
