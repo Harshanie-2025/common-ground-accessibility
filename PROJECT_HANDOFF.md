@@ -13,7 +13,7 @@ An accessibility-first civic dashboard for reporting street barriers and choosin
 
 - Responsive satellite-map dashboard with browser geolocation, latitude/longitude readout, issue pins, report form, photo preview, duplicate merging, issue scoring, persona switching, Top 10 ranking, and a budget planner.
 - Nearby schools are discovered from OpenStreetMap when location is available. If the automatic nearby-data lookup fails, the Route panel offers a user-triggered Nominatim school search. The school search is bounded and may return incomplete matches.
-- Added a separately toggled real-world OpenStreetMap context layer, loaded after browser location is granted. It shows nearby public destinations, transit, crossings, steps, kerbs, and wheelchair-access tags within 1.5 km. Its search center is rounded to about 100 m. These are map features, not verified citizen reports, and they do not enter the demo issue rankings.
+- Added a separately toggled real-world OpenStreetMap context layer, loaded after browser location is granted. It shows mapped schools/public destinations and transit within 3 km, plus crossings, steps, kerbs, and wheelchair-access tags within 1.5 km. Its search center is rounded to about 100 m. These are map features, not verified citizen reports, and they do not enter the demo issue rankings.
 - Routing is no longer school-only. Users can:
   - choose **Set start on map** or **Set destination on map**, then tap a point on the map;
   - search any address or place and use a result as the route start or destination;

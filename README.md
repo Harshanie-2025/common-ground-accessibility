@@ -29,7 +29,7 @@ The API key stays in the local server environment and `.env` is ignored by Git. 
 
 ## Features
 
-- Esri satellite map centered on your browser location, with a Bengaluru demo fallback, selectable issue pins, and visible latitude/longitude. Nearby schools and a separate OpenStreetMap context layer are loaded after location access is granted. The context layer shows mapped public destinations, transit, crossings, steps, kerbs, and wheelchair-access tags; its search center is rounded to about 100 m.
+- Esri satellite map centered on your browser location, with a Bengaluru demo fallback, selectable issue pins, and visible latitude/longitude. Nearby schools and a separate OpenStreetMap context layer are loaded after location access is granted. The context layer shows mapped schools/public destinations and transit within 3 km, plus crossings, steps, kerbs, and wheelchair-access tags within 1.5 km; its search center is rounded to about 100 m.
 - Four accessibility personas plus an everyone view; scores and rankings respond to the selected person.
 - Plain-language Top 10 queue and a breakdown of impact, nearby footfall, confirmations, and time unresolved.
 - Report categories, map pin, photo attachment, multilingual text classification, and optional browser speech recognition in English, Hindi, and Kannada.

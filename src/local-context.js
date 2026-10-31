@@ -1,8 +1,10 @@
-const RADIUS_METERS = 1500;
+const PLACE_RADIUS_METERS = 3000;
+const ACCESS_RADIUS_METERS = 1500;
 const MAX_PLACES = 45;
 const MAX_ACCESS_FEATURES = 45;
 
 const FACILITY_LABELS = {
+  school: 'School',
   hospital: 'Hospital',
   clinic: 'Clinic',
   doctors: 'Doctor',
@@ -34,7 +36,7 @@ function localFeature(element, center) {
   const wheelchair = ['yes', 'no', 'limited'].includes(tags.wheelchair)
     ? tags.wheelchair
     : '';
-  const isAccess = isSteps || hasKerb || isCrossing || Boolean(wheelchair);
+  const isAccess = isSteps || hasKerb || isCrossing;
   const isTransit = tags.amenity === 'bus_station'
     || tags.highway === 'bus_stop'
     || tags.public_transport === 'platform';
@@ -60,7 +62,7 @@ function localFeature(element, center) {
   if (!notes.length) notes.push('Nearby real-world destination from OpenStreetMap.');
 
   return {
-    id: `${element.type}-${element.id}`,
+    id: `osm-${element.type}-${element.id}`,
     osmType: element.type,
     osmId: element.id,
     lat,
@@ -68,6 +70,7 @@ function localFeature(element, center) {
     name: name || label,
     label,
     kind: isAccess ? 'access' : isTransit ? 'transit' : 'place',
+    accessTagged: Boolean(wheelchair),
     notes,
     distance: distanceMeters(center, { lat, lon }),
   };
@@ -77,27 +80,27 @@ export function buildLocalContextQuery(center) {
   // Round to roughly 100 m before sending the search center to the public API.
   const lat = Number(Number(center.lat).toFixed(3));
   const lon = Number(Number(center.lng ?? center.lon).toFixed(3));
-  const latDelta = RADIUS_METERS / 111320;
-  const lonDelta = RADIUS_METERS / (111320 * Math.max(0.01, Math.cos((lat * Math.PI) / 180)));
-  const south = (lat - latDelta).toFixed(4);
-  const west = (lon - lonDelta).toFixed(4);
-  const north = (lat + latDelta).toFixed(4);
-  const east = (lon + lonDelta).toFixed(4);
-  const bounds = `(${south},${west},${north},${east})`;
+  const latDelta = radius => radius / 111320;
+  const lonDelta = radius => radius / (111320 * Math.max(0.01, Math.cos((lat * Math.PI) / 180)));
+  const boundsFor = radius => `(${(lat - latDelta(radius)).toFixed(4)},${(lon - lonDelta(radius)).toFixed(4)},${(lat + latDelta(radius)).toFixed(4)},${(lon + lonDelta(radius)).toFixed(4)})`;
+  const placeBounds = boundsFor(PLACE_RADIUS_METERS);
+  const accessBounds = boundsFor(ACCESS_RADIUS_METERS);
+  const placeAmenities = 'school|hospital|clinic|doctors|pharmacy|bus_station|marketplace|community_centre|library|toilets|public_building';
   return `[out:json][timeout:10];(
- nwr${bounds}["amenity"~"^(hospital|clinic|doctors|pharmacy|bus_station|marketplace|community_centre|library|toilets|public_building)$"];
- nwr${bounds}["highway"~"^(bus_stop|crossing|steps)$"];
- nwr${bounds}["public_transport"="platform"];
- nwr${bounds}["barrier"="kerb"];
- node${bounds}["kerb"];
- nwr${bounds}["amenity"~"^(hospital|clinic|doctors|pharmacy|bus_station|marketplace|community_centre|library|toilets|public_building)$"]["wheelchair"~"^(yes|no|limited)$"];
+ nwr${placeBounds}["amenity"~"^(${placeAmenities})$"];
+ nwr${placeBounds}["highway"~"^(bus_stop)$"];
+ nwr${placeBounds}["public_transport"="platform"];
+ nwr${accessBounds}["highway"~"^(crossing|steps)$"];
+ nwr${accessBounds}["barrier"="kerb"];
+ node${accessBounds}["kerb"];
+ nwr${accessBounds}["amenity"~"^(${placeAmenities})$"]["wheelchair"~"^(yes|no|limited)$"];
 );out center tags 500;`;
 }
 
 export function parseLocalContext(elements, center) {
   const features = (Array.isArray(elements) ? elements : [])
     .map((element) => localFeature(element, center))
-    .filter((feature) => feature && feature.distance <= RADIUS_METERS)
+    .filter((feature) => feature && feature.distance <= (feature.kind === 'access' ? ACCESS_RADIUS_METERS : PLACE_RADIUS_METERS))
     .sort((a, b) => a.distance - b.distance);
 
   const access = features.filter((feature) => feature.kind === 'access').slice(0, MAX_ACCESS_FEATURES);

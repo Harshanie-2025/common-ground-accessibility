@@ -106,18 +106,21 @@ function updateLocalContextUI(){
  if(!located){button.textContent='Use location to load data';status.textContent='Nearby OpenStreetMap context loads after you allow location access.';return}
  if(localContextPending){button.textContent='Loading nearby data…';status.textContent='Looking up mapped places and accessibility details around your location.';return}
  if(localContextError){button.disabled=false;button.textContent='Retry nearby data';status.textContent=`OpenStreetMap lookup failed: ${localContextError}`;return}
- if(!localContextLoaded){button.textContent='Load nearby OSM data';status.textContent='Load mapped public places and accessibility details within 1.5 km of your location.';return}
+ if(!localContextLoaded){button.textContent='Load nearby OSM data';status.textContent='Load mapped places within 3 km and accessibility features within 1.5 km of your location.';return}
  const placeCount=localContext.filter(feature=>feature.kind!=='access').length;
  const accessCount=localContext.filter(feature=>feature.kind==='access').length;
+ const taggedPlaceCount=localContext.filter(feature=>feature.accessTagged).length;
  const timestamp=localContextTimestamp?new Date(localContextTimestamp).toLocaleString() : '';
  button.disabled=false;
  button.textContent=localContextVisible?'Hide nearby OSM data':'Show nearby OSM data';
  status.textContent=localContext.length
-  ? `Showing ${placeCount} mapped places and ${accessCount} mapped accessibility-related features within 1.5 km${timestamp?` · OSM data snapshot ${timestamp}`:''}. Coverage is incomplete; check conditions on site.`
-  : 'No matching features were mapped within 1.5 km. Missing map data does not mean the area is accessible.';
+  ? `Showing ${placeCount} mapped places within 3 km, ${accessCount} mapped crossings/steps/kerbs within 1.5 km, and ${taggedPlaceCount} places with wheelchair tags${timestamp?` · OSM snapshot ${timestamp}`:''}. Coverage is incomplete; check conditions on site.`
+  : 'No matching features were mapped within 3 km for places or 1.5 km for access details. Missing map data does not mean the area is accessible.';
 }
 function localFeatureIcon(feature){
  if(feature.kind==='access')return '⚠';
+ if(feature.accessTagged)return 'W';
+ if(feature.label==='School')return 'S';
  if(feature.label==='Hospital'||feature.label==='Clinic'||feature.label==='Doctor')return '+';
  if(feature.kind==='transit')return 'B';
  if(feature.label==='Pharmacy')return 'Rx';
@@ -126,12 +129,13 @@ function localFeatureIcon(feature){
 function drawLocalContext(){
  localContextLayer.clearLayers();
  if(!localContextVisible)return;
- localContext.forEach(feature=>{
+ const schoolKeys=new Set(schools.map(s=>`${s.osmType}-${s.osmId}`));
+ localContext.filter(feature=>!schoolKeys.has(`${feature.osmType}-${feature.osmId}`)).forEach(feature=>{
   const sourceUrl=`https://www.openstreetmap.org/${encodeURIComponent(feature.osmType)}/${encodeURIComponent(feature.osmId)}`;
   const notes=feature.notes.map(note=>`<li>${esc(note)}</li>`).join('');
   const popup=`<div class="osm-popup"><strong>${esc(feature.name)}</strong><span>${esc(feature.label)}</span><ul>${notes}</ul><small>Mapped context only; this is not a user-verified issue.</small><a href="${sourceUrl}" target="_blank" rel="noopener noreferrer">View OpenStreetMap feature</a></div>`;
   const marker=L.marker([feature.lat,feature.lon],{
-   icon:L.divIcon({className:`osm-marker osm-${feature.kind}`,html:`<span aria-hidden="true">${localFeatureIcon(feature)}</span>`,iconSize:[30,30],iconAnchor:[15,15]}),
+   icon:L.divIcon({className:`osm-marker osm-${feature.kind}${feature.accessTagged?' osm-tagged':''}`,html:`<span aria-hidden="true">${localFeatureIcon(feature)}</span>`,iconSize:[30,30],iconAnchor:[15,15]}),
    title:`${feature.label}: ${feature.name}`,
    alt:`${feature.label}: ${feature.name}`,
   }).addTo(localContextLayer).bindPopup(popup,{maxWidth:280});
@@ -149,12 +153,14 @@ async function loadNearbyLocalContext(center,{force=false}={}){
  if(!force&&key===localContextCenterKey&&(localContextLoaded||localContextPending))return;
  const request=++localContextRequest;
  localContextCenterKey=key;localContextPending=true;localContextError='';localContextLoaded=false;localContext=[];localContextVisible=true;localContextTimestamp='';
+ rebuildRouteOptions(true);
  localContextLayer.addTo(geoMap);drawLocalContext();updateLocalContextUI();
  try{
   const result=await fetchLocalContext(center);
   if(request!==localContextRequest)return;
   localContext=result.features;localContextTimestamp=result.timestamp;localContextPending=false;localContextLoaded=true;localContextError='';
-  drawLocalContext();updateLocalContextUI();
+  rebuildRouteOptions(true);drawLocalContext();updateLocalContextUI();
+  if(!$('#p-rt').hidden)routeUI();
  }catch(error){
   if(request!==localContextRequest)return;
   localContextPending=false;localContextLoaded=false;localContextError=error.message||'Nearby map data is temporarily unavailable.';
@@ -181,8 +187,10 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 function schoolKind(s){return s.govt&&s.primary?'Government primary school':s.govt?'Government school':s.primary?'Primary school':'School'}
 function rebuildRouteOptions(keep=true){
  const oldA=$('#ra').value,oldB=$('#rb').value;
- const stops=[{id:'current',name:located?'My location':'Bengaluru demo center',lat:origin.lat,lon:origin.lng,kind:located?'Your location':'Demo map center'},...Object.values(routePins).filter(Boolean),...schools];
- const options=stops.map(s=>{const label=s.id==='current'?s.name:s.id.startsWith('school-')?`${s.name} · ${schoolKind(s)}`:s.name;return`<option value="${esc(s.id)}">${esc(label)}</option>`}).join('');
+ const schoolKeys=new Set(schools.map(s=>`${s.osmType}-${s.osmId}`));
+ const mappedPlaces=localContext.filter(feature=>feature.kind!=='access'&&!schoolKeys.has(`${feature.osmType}-${feature.osmId}`)).slice(0,30);
+ const stops=[{id:'current',name:located?'My location':'Bengaluru demo center',lat:origin.lat,lon:origin.lng,kind:located?'Your location':'Demo map center'},...Object.values(routePins).filter(Boolean),...schools,...mappedPlaces];
+ const options=stops.map(s=>{const label=s.id==='current'?s.name:s.id.startsWith('school-')?`${s.name} · ${schoolKind(s)}`:s.id.startsWith('osm-')?`${s.name} · ${s.label}`:s.name;return`<option value="${esc(s.id)}">${esc(label)}</option>`}).join('');
  ['ra','rb'].forEach(id=>{$('#'+id).innerHTML=options});
  const primary=schools.find(s=>s.primary)||schools.find(s=>s.govt)||schools[0];
  $('#ra').value=keep&&stops.some(s=>s.id===oldA)?oldA:(routePins.from?.id||'current');
@@ -408,7 +416,7 @@ document.querySelectorAll('#pers button').forEach(b=>b.onclick=()=>{ps=b.dataset
 const C=REPAIR_COSTS,fmt=n=>'₹'+n.toLocaleString('en-IN'),live=()=>issues.filter(i=>!i.fx);
 const wt=i=>P[ps].w[K.indexOf(i.t)];
 let currentRouteKey='';
-const routeStop=id=>id==='current'?{id:'current',name:located?'My location':'Bengaluru demo center',lat:origin.lat,lon:origin.lng}:routePins.from?.id===id?routePins.from:routePins.to?.id===id?routePins.to:schools.find(s=>s.id===id);
+const routeStop=id=>id==='current'?{id:'current',name:located?'My location':'Bengaluru demo center',lat:origin.lat,lon:origin.lng}:routePins.from?.id===id?routePins.from:routePins.to?.id===id?routePins.to:schools.find(s=>s.id===id)||localContext.find(feature=>feature.id===id);
 const profile=()=>ps==='wheel'?'wheelchair':ps==='vis'?'blind':'foot';
 const fmtDistance=km=>km<1?`${Math.round(km*1000)} m`:`${km.toFixed(1)} km`;
 const fmtDuration=seconds=>{const minutes=Math.max(1,Math.round(seconds/60));return minutes<60?`${minutes} min`:`${Math.floor(minutes/60)} hr ${minutes%60} min`};

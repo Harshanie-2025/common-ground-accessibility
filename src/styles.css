@@ -48,6 +48,7 @@ main{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(330px,1fr);gap:1
 .osm-marker{background:none;border:0}
 .osm-marker span{display:grid;place-items:center;width:30px;height:30px;border:2px solid #fff;border-radius:50%;background:#167b78;color:#fff;font-size:14px;font-weight:800;box-shadow:0 2px 8px #0009}
 .osm-access span{background:#8153a5}
+.osm-tagged span{background:#8153a5}
 .osm-transit span{background:#2869a5}
 .osm-popup{display:grid;gap:4px;min-width:180px;color:#18313a}
 .osm-popup strong{font-size:14px}
