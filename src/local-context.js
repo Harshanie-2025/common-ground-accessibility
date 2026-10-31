@@ -75,22 +75,29 @@ function localFeature(element, center) {
 
 export function buildLocalContextQuery(center) {
   // Round to roughly 100 m before sending the search center to the public API.
-  const lat = Number(center.lat).toFixed(3);
-  const lon = Number(center.lng ?? center.lon).toFixed(3);
-  return `[out:json][timeout:18];(
- nwr(around:${RADIUS_METERS},${lat},${lon})["amenity"~"^(hospital|clinic|doctors|pharmacy|bus_station|marketplace|community_centre|library|toilets|public_building)$"];
- nwr(around:${RADIUS_METERS},${lat},${lon})["highway"~"^(bus_stop|crossing|steps)$"];
- nwr(around:${RADIUS_METERS},${lat},${lon})["public_transport"="platform"];
- nwr(around:${RADIUS_METERS},${lat},${lon})["barrier"="kerb"];
- node(around:${RADIUS_METERS},${lat},${lon})["kerb"];
- nwr(around:${RADIUS_METERS},${lat},${lon})["amenity"~"^(hospital|clinic|doctors|pharmacy|bus_station|marketplace|community_centre|library|toilets|public_building)$"]["wheelchair"~"^(yes|no|limited)$"];
+  const lat = Number(Number(center.lat).toFixed(3));
+  const lon = Number(Number(center.lng ?? center.lon).toFixed(3));
+  const latDelta = RADIUS_METERS / 111320;
+  const lonDelta = RADIUS_METERS / (111320 * Math.max(0.01, Math.cos((lat * Math.PI) / 180)));
+  const south = (lat - latDelta).toFixed(4);
+  const west = (lon - lonDelta).toFixed(4);
+  const north = (lat + latDelta).toFixed(4);
+  const east = (lon + lonDelta).toFixed(4);
+  const bounds = `(${south},${west},${north},${east})`;
+  return `[out:json][timeout:10];(
+ nwr${bounds}["amenity"~"^(hospital|clinic|doctors|pharmacy|bus_station|marketplace|community_centre|library|toilets|public_building)$"];
+ nwr${bounds}["highway"~"^(bus_stop|crossing|steps)$"];
+ nwr${bounds}["public_transport"="platform"];
+ nwr${bounds}["barrier"="kerb"];
+ node${bounds}["kerb"];
+ nwr${bounds}["amenity"~"^(hospital|clinic|doctors|pharmacy|bus_station|marketplace|community_centre|library|toilets|public_building)$"]["wheelchair"~"^(yes|no|limited)$"];
 );out center tags 500;`;
 }
 
 export function parseLocalContext(elements, center) {
   const features = (Array.isArray(elements) ? elements : [])
     .map((element) => localFeature(element, center))
-    .filter(Boolean)
+    .filter((feature) => feature && feature.distance <= RADIUS_METERS)
     .sort((a, b) => a.distance - b.distance);
 
   const access = features.filter((feature) => feature.kind === 'access').slice(0, MAX_ACCESS_FEATURES);
@@ -109,7 +116,7 @@ export async function fetchLocalContext(center) {
     try {
       const response = await fetch(`${endpoint}?data=${encodeURIComponent(query)}`, {
         headers: { Accept: 'application/json' },
-        signal: AbortSignal.timeout(20000),
+        signal: AbortSignal.timeout(12000),
       });
       if (response.status === 406 || response.status === 429) {
         throw new Error('OpenStreetMap is busy. Wait a little and retry.');
@@ -127,5 +134,11 @@ export async function fetchLocalContext(center) {
     }
   }
 
+  if (lastError?.name === 'TimeoutError' || /timed out|signal timed out/i.test(lastError?.message || '')) {
+    throw new Error('Nearby OpenStreetMap servers timed out. Wait a moment and retry.');
+  }
+  if (/failed to fetch|network/i.test(lastError?.message || '')) {
+    throw new Error('Could not reach OpenStreetMap. Check the connection and retry.');
+  }
   throw lastError || new Error('Nearby OpenStreetMap data is temporarily unavailable.');
 }
