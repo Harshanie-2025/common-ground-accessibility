@@ -14,6 +14,7 @@ const P=Object.fromEntries(Object.entries(PERSONAS).map(([key,p])=>[key,{n:p.nam
 const HISTORY_KEY='last100m.completedTasks.v1';
 function readHistory(){try{const rows=JSON.parse(localStorage.getItem(HISTORY_KEY)||'[]');return Array.isArray(rows)?rows.filter(r=>r&&Number.isFinite(Number(r.issueId))&&Number.isFinite(Number(r.lat))&&Number.isFinite(Number(r.lon))).slice(0,200):[]}catch{return[]}}
 let historyRecords=readHistory();
+const sessionFixedIds=new Set();
 let resolutionChart = null;
 
 function updateResolutionChart() {
@@ -271,6 +272,7 @@ function render(){
  $('#note').textContent=`Ranked for ${p.n.toLowerCase()}. Switch the persona above and watch the order change.`;
  document.querySelectorAll('#pers button').forEach(b=>b.classList.toggle('on',b.dataset.p==ps));
  issues.forEach(i=>{
+  if(i.fx&&!sessionFixedIds.has(i.id)){if(i.marker){issueLayer.removeLayer(i.marker);i.marker=null}return}
   const score=sc(i),color=i.fx?cssColor('--c4'):bandColor(band(score.total)[1]);
   const icon=L.divIcon({className:'pin-wrap',html:'<span class="map-pin '+(i.id==cur?'active ':'')+(i.fx?'fixed':'')+'" style="--pin-color:'+color+'"><span>'+(i.fx?'✓':score.total)+'</span></span>',iconSize:[32,32],iconAnchor:[16,30]});
   if(!i.marker){i.marker=L.marker(toLatLng(i.x,i.y),{icon,title:'Issue #'+i.id+', '+T[i.t]+', score '+score.total,riseOnHover:true}).addTo(issueLayer);i.marker.on('click',e=>{if(reportPickActive){if(e.originalEvent)L.DomEvent.stopPropagation(e.originalEvent);setReportLocation(e.latlng);return}if(e.originalEvent)L.DomEvent.stopPropagation(e.originalEvent);sel(i.id)})}
@@ -377,7 +379,7 @@ function brief(){const r=live().map(i=>({i,s:sc(i)})).sort((a,b)=>b.s.total-a.s.
  try{window.print()}catch(e){toast('Printing is blocked here. Open the page link in its own tab and try again.')}}
 const cmp=i=>{const st=`style='clip-path:inset(0 calc(100% - var(--p)*1%) 0 0)'`;return`<div class='cmp' style='--p:50'><img src='${i.af}' alt='After the fix'>${i.ph?`<img src='${i.ph}' alt='Before the fix' ${st}>`:`<div class='pv' ${st}>No before photo</div>`}</div><input type='range' min='0' max='100' value='50' aria-label='Before and after'>`};
 function fixIt(i){
- i.fx=true;i.li.hidden=true;i.completedAt=new Date().toISOString();
+ i.fx=true;sessionFixedIds.add(i.id);i.li.hidden=true;i.completedAt=new Date().toISOString();
  const ll=toLatLng(i.x,i.y),record={issueId:i.id,type:i.t,title:T[i.t],x:i.x,y:i.y,lat:ll.lat,lon:ll.lng,baseLat:origin.lat,baseLon:origin.lng,completedAt:i.completedAt,reports:i.n,afterPhoto:Boolean(i.af)};
  historyRecords=[record,...historyRecords.filter(r=>!(Number(r.issueId)===i.id&&r.type===i.t&&r.x===i.x&&r.y===i.y))].slice(0,200);
  try{localStorage.setItem(HISTORY_KEY,JSON.stringify(historyRecords))}catch{toast('Task marked fixed. Browser storage is unavailable, so history lasts only until this page closes.')}
