@@ -74,6 +74,35 @@
   <div class="tabs"><button data-t="top" class="on">Top 10 fixes</button><button data-t="rep">Report</button><button data-t="det">Issue</button><button data-t="rt">Route</button><button data-t="plan">Plan</button><button data-t="hist">History <span class="tab-count" id="history-count">0</span></button></div>
   <div class="pn" id="p-top"><p class="mu" id="note"></p><ol id="top"></ol></div>
   <div class="pn" id="p-rep" hidden>
+    <div class="resolution-card">
+  <div class="resolution-heading">
+    <div>
+      <h3>Issue Resolution</h3>
+      <p class="mu">Track accessibility improvements</p>
+    </div>
+    <span class="resolution-rate" id="resolution-rate">0%</span>
+  </div>
+
+  <div class="resolution-chart">
+    <canvas id="resolution-chart"
+      aria-label="Pie chart showing solved and pending accessibility cases">
+    </canvas>
+  </div>
+
+  <div class="resolution-legend">
+    <div>
+      <span class="legend-dot solved-dot"></span>
+      <span>Solved</span>
+      <strong id="solved-count">0</strong>
+    </div>
+
+    <div>
+      <span class="legend-dot pending-dot"></span>
+      <span>Pending</span>
+      <strong id="pending-count">0</strong>
+    </div>
+  </div>
+</div>
    <div class='two' style='grid-template-columns:1fr auto auto'><input class='in' id='vt' placeholder='Say or type it: ಗುಂಡಿ, गड्ढा, pothole' aria-label='Describe the issue'><select id='lg' aria-label='Language'><option value='en-IN'>English</option><option value='hi-IN'>हिन्दी</option><option value='kn-IN'>ಕನ್ನಡ</option></select><button class='sm' id='mic' style='margin:0' aria-label='Speak'>🎤</button></div>
    <p id="pst" class="mu"></p>
    <button class="sm report-pick-btn" id="pick-report-location" type="button" aria-pressed="false">Choose location on map</button>
